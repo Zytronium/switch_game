@@ -30,7 +30,7 @@ middle, not "any network."
 ## Requirements
 
 - Rust 1.75+ and Cargo
-- Python 3.8+
+- Python 3.14+
 - [`maturin`](https://www.maturin.rs/) to build the extension:
   `pip install maturin`
 - Linux. Raw `AF_PACKET` sockets are a Linux concept; `pnet`'s datalink
@@ -168,7 +168,7 @@ while True:
 ## Limitations / things the game layer needs to handle itself
 
 - **No reliability guarantees.** Raw L2 has no acknowledgment, ordering,
-  or retransmission. `seq` is provided so you can build whatever
+  or retransmission. `seq` is provided so we can build whatever
   ordering/dedup/retry scheme fits the game (e.g. treat state-sync
   frames as "latest wins" and ignore anything with an older `seq`).
 - **No fragmentation.** Payloads over `MAX_PAYLOAD_LEN` are rejected
