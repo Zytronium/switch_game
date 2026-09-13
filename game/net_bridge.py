@@ -62,6 +62,13 @@ MSG_SYNC = 13
 MSG_GAME_OVER = 14
 MSG_ACK = 15  # not in _EVENT_NAMES: acks are consumed internally by
               # poll(), never handed out as a plain NetEvent
+MSG_ACK_RESEND_REQUEST = 16  # also internal-only, see _handle_ack_resend_request
+
+# How long a receiver remembers "here's the ack I sent for seq N",
+# so it can answer a resend request if the original ack got lost.
+# Comfortably longer than ack_timeout_ms so a resend request always
+# still finds the record it's asking about.
+_RECENT_ACK_TTL_S = 3.0
 
 _EVENT_NAMES = {
     MSG_HELLO: "hello",
@@ -85,7 +92,9 @@ class NetEvent:
     type: one of _EVENT_NAMES' values, or "delivered" / "delivery_failed"
     data: for delivered/delivery_failed, holds {"msg_type": int,
           "system": str|None} and, for delivery_failed, also
-          {"reason": "corrupted"|"timeout"}
+          {"reason": "corrupted"|"lost"}, "corrupted" means the peer
+          explicitly said so, "lost" means neither the original
+          message nor a follow-up resend request ever got a reply.
     """
     type: str
     seq: int
@@ -100,6 +109,8 @@ class _PendingSend:
     data: dict  # original payload dict, kept so game_over can be resent verbatim
     sent_time: float
     retry_count: int = 0
+    awaiting_ack_resend: bool = False  # True once we've asked the peer to
+                                        # resend its ack and are on our second wait
 
 
 @dataclass
@@ -112,6 +123,7 @@ class NetBridge:
     _sock: "switch_net.SwitchSocket" = field(init=False, repr=False)
     _last_seq_seen: dict = field(default_factory=dict, init=False, repr=False)
     _pending: dict = field(default_factory=dict, init=False, repr=False)  # seq -> _PendingSend
+    _recent_acks: dict = field(default_factory=dict, init=False, repr=False)  # seq -> (ok, timestamp)
 
     def __post_init__(self):
         self._sock = switch_net.SwitchSocket(
@@ -186,15 +198,35 @@ class NetBridge:
         return seq
 
     def _send_ack(self, acked_seq: int, ok: bool) -> None:
-        # Acks are not themselves tracked for delivery, an ack that
-        # goes missing just means the original sender's own timeout
-        # fires, which is the correct fallback behavior anyway.
+        # Remember what we told them, in case they never get it and
+        # have to ask again. Acks-of-acks would be infinite regress,
+        # so this record (not another ack) is what answers a resend
+        # request.
+        self._recent_acks[acked_seq] = (ok, time.monotonic())
         self._sock.send_auto(MSG_ACK, _pack_payload({"ack_seq": acked_seq, "ok": ok}))
+
+    def _handle_ack_resend_request(self, raw_payload: bytes) -> None:
+        data = _unpack_payload(raw_payload)
+        if data is None:
+            return  # corrupted request; the asker's own follow-up timeout resolves it
+        seq = data.get("seq")
+        entry = self._recent_acks.get(seq)
+        if entry is None:
+            return  # we have no record of this seq (never seen it, or it aged out); stay silent
+        ok, _acked_at = entry
+        self._send_ack(seq, ok)
+
+    def _prune_recent_acks(self) -> None:
+        now = time.monotonic()
+        expired = [seq for seq, (_, ts) in self._recent_acks.items() if now - ts > _RECENT_ACK_TTL_S]
+        for seq in expired:
+            del self._recent_acks[seq]
 
     def _retry_send(self, seq: int, pending: _PendingSend) -> None:
         self._sock.send(pending.msg_type, seq, _pack_payload(pending.data))
         pending.sent_time = time.monotonic()
         pending.retry_count += 1
+        pending.awaiting_ack_resend = False  # fresh attempt, restart its own two-phase check
 
     # -------- receiving --------
 
@@ -206,6 +238,7 @@ class NetBridge:
         never blocks longer than read_timeout_ms.
         """
         events = []
+        self._prune_recent_acks()
 
         while True:
             result = self._sock.recv()
@@ -217,6 +250,10 @@ class NetBridge:
                 event = self._handle_ack(raw_payload, src_mac)
                 if event is not None:
                     events.append(event)
+                continue
+
+            if msg_type == MSG_ACK_RESEND_REQUEST:
+                self._handle_ack_resend_request(raw_payload)
                 continue
 
             data = _unpack_payload(raw_payload)
@@ -276,6 +313,18 @@ class NetBridge:
             if now - pending.sent_time < timeout_s:
                 continue
 
+            if not pending.awaiting_ack_resend:
+                # First silence: we can't yet tell whether the original
+                # message was lost, or it arrived fine and only the ack
+                # coming back was lost/corrupted. Ask before assuming
+                # the worst.
+                self._sock.send_auto(MSG_ACK_RESEND_REQUEST, _pack_payload({"seq": seq}))
+                pending.awaiting_ack_resend = True
+                pending.sent_time = now
+                continue
+
+            # Second silence: even the resend request went unanswered.
+            # Now we treat it as genuinely unresolved.
             if pending.msg_type in _AUTO_RETRY_TYPES:
                 self._retry_send(seq, pending)
             else:
@@ -284,7 +333,7 @@ class NetBridge:
                     NetEvent(
                         type="delivery_failed",
                         seq=seq,
-                        data={"msg_type": pending.msg_type, "system": pending.system, "reason": "timeout"},
+                        data={"msg_type": pending.msg_type, "system": pending.system, "reason": "lost"},
                         src_mac="",
                     )
                 )
