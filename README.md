@@ -72,3 +72,37 @@ Each player can make the following moves at any time:
 | `ins` or `inspect`          | system (optional) | Inspects the status of the opponent's system(s)                               |
 | `pot` or `honeypot`         | system            | Sets up a honeypot system that masks itself as one of the legitimate systems. |
 | `quit`, `exit` or `forfeit` |                   | Forfeits the game after confirming player is sure they want to forfeit.       |
+
+## UI
+
+The planned UI will look like this:
+
+```
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║ [WARNING] INCOMING ATTACK DETECTED!                              SWITCH 'n HACK v1.0 ║
+╠════════════════════════╦═════════════════════════════════════════════════════════════╣
+║                        ║  SYSTEM STATUS                                              ║
+║ > tar antivirus        ║                                                             ║
+║ > tar firewall         ║  ╔════════════════╗                                         ║
+║ > def firewall         ║  ║ FIREWALL       ║ [░░░░] COMPROMISED                      ║
+║ > ins                  ║  ╠════════════════╣                                         ║
+║ > rep routing_table    ║  ║ ANTIVIRUS      ║ [██░░] Degraded                         ║
+║ > pot arp_cache        ║  ╠════════════════╣                                         ║
+║ > tar routing_table    ║  ║ ROUTING TABLE  ║ [████] Operational                      ║
+║ ! failed               ║  ╠════════════════╣                                         ║
+║ > tar routing_table    ║  ║ ARP CACHE      ║ [██░░] Degraded                         ║
+║ > def antivirus        ║  ╠════════════════╣                                         ║
+║                        ║  ║ TERMINAL       ║ [████] Operational                      ║
+║                        ║  ╠════════════════╣                                         ║
+║                        ║  ║ KERNEL         ║ [████] Operational                      ║
+║                        ║  ╚════════════════╝                                         ║
+║                        ║                                                             ║
+║                        ║  HONEYPOT STATUS                                            ║
+║                        ║  [ACTIVE] Masking: ARP Cache                                ║
+║                        ║                                                             ║
+║                        ║  COOLDOWNS                                                  ║
+║                        ║  Attack: READY   Repair: READY   Honeypot: 00:53            ║
+║                        ╚═════════════════════════════════════════════════════════════╣
+║ >                                                                                    ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
