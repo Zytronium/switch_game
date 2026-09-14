@@ -241,14 +241,27 @@ class Game:
     # -------- main loop --------
 
     def tick(self) -> None:
-        if self.phase == "game_over":
-            return
         now = time.monotonic()
-        self._resolve_busy_action(now)
-        self._check_pending_timeouts(now)
-        self._check_match_timer(now)
-        for event in self.bridge.poll():
-            self._handle_event(event, now)
+        events = self.bridge.poll()
+
+        # Network events are authoritative for the opponent's state.  Drain
+        # them before completing local timed actions so a kernel attack and a
+        # repair becoming due in the same tick have one deterministic order:
+        # the attack is resolved against the state that existed when this
+        # batch was received.  In particular, never finish a repair after a
+        # kernel attack has already ended the match.
+        if self.phase != "game_over":
+            for event in events:
+                self._handle_event(event, now)
+                if self.phase == "game_over":
+                    break
+
+            if self.phase == "game_over":
+                return
+
+            self._check_pending_timeouts(now)
+            self._resolve_busy_action(now)
+            self._check_match_timer(now)
 
     def _resolve_busy_action(self, now: float) -> None:
         if not self.busy_until or now < self.busy_until:
