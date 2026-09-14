@@ -55,7 +55,7 @@ Each player can make the following moves at any time:
 3. **Repair a system** - Spends 10 seconds to increase a system's status by one level. You cannot run any other commands
    during this time period.
 4. **Inspect system(s)** - Displays the opponent's status of all systems, optionally specifying a single system to
-   inspect instead. Not invulnerable to firewalls. Does not reveal honeypots.
+   inspect instead. Inspections bypass firewalls. Does not reveal honeypots.
 5. **Setup a honeypot system** - Spends 10 seconds creating a new honeypot system masking itself as one of the legitimate
    systems. When the opponent goes to attack the honeypot, the attack brings down the honeypot but doesn't touch the
    real system. 1 minute cooldown. Only 1 honeypot can exist at a time.
@@ -64,14 +64,14 @@ Each player can make the following moves at any time:
 
 ### Commands
 
-| Commands                    | Parameters        | Description                                                                   |
-|-----------------------------|-------------------|-------------------------------------------------------------------------------|
-| `tar` or `target`           | system            | Targets an attack on a specific system                                        |
-| `def` or `defend`           | system            | Focuses antivirus on a specific system for 5 seconds                          |
-| `rep` or `repair`           | system            | Repairs a system by increasing its status by one level                        |
-| `ins` or `inspect`          | system (optional) | Inspects the status of the opponent's system(s)                               |
-| `pot` or `honeypot`         | system            | Sets up a honeypot system that masks itself as one of the legitimate systems. |
-| `quit`, `exit` or `forfeit` |                   | Forfeits the game after confirming player is sure they want to forfeit.       |
+| Commands                           | Parameters        | Description                                                                   |
+|------------------------------------|-------------------|-------------------------------------------------------------------------------|
+| `tar`, `target`, `atk` or `attack` | system            | Targets an attack on a specific system                                        |
+| `def` or `defend`                  | system            | Focuses antivirus on a specific system for 5 seconds                          |
+| `rep` or `repair`                  | system            | Repairs a system by increasing its status by one level                        |
+| `ins` or `inspect`                 | system (optional) | Inspects the status of the opponent's system(s)                               |
+| `pot` or `honeypot`                | system            | Sets up a honeypot system that masks itself as one of the legitimate systems. |
+| `quit`, `exit` or `forfeit`        |                   | Forfeits the game after confirming player is sure they want to forfeit.       |
 
 ## UI
 

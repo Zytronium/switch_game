@@ -18,7 +18,7 @@ to correctly resolve an incoming attack. So:
   attacker can be locked out briefly, without revealing the real system's
   status.
 - "inspect" is the same request/response shape: inspector -> target,
-  and the target (gated by its own firewall) reports back, with any
+  and the target reports back regardless of its firewall state, with any
   honeypot-masked slot reported as a healthy decoy.
 - "repair", "defend", and "honeypot" are 100% local. They only ever
   change your own systems, which you already authoritatively know, so
@@ -51,9 +51,8 @@ spec, adjust freely:
 - ARP cache's "occasional real packet corruption" is wired directly
   into NetBridge.self_corruption_chance, an actual corrupted-frame
   chance on the wire, not just flavor text.
-- Inspect being "not invulnerable to firewalls" is modeled as a chance
-  (driven by the TARGET's firewall) that the whole inspect is blocked
-  outright, no partial reveals.
+- Inspect bypasses firewalls and reports the requested status unless the
+  request itself is invalid or the response is lost on the wire.
 - A honeypot always presents as "operational" to the opponent, a
   healthy-looking decoy, since the README doesn't specify what a
   masked slot displays as.
@@ -112,18 +111,11 @@ SELF_CORRUPTION_CHANCE = {
     "compromised": 0.20,
 }
 
-# Inspect: chance the TARGET's firewall blocks the whole inspect outright.
-INSPECT_BLOCK_CHANCE = {
-    "operational": 0.50,
-    "degraded": 0.20,
-    "compromised": 0.0,
-}
-
 BASE_SYSTEMS = ["firewall", "antivirus", "routing_table", "arp_cache"]
 ALL_ATTACKABLE = BASE_SYSTEMS + ["terminal", "kernel"]
 
 COMMAND_ALIASES = {
-    "tar": "target", "target": "target",
+    "tar": "target", "target": "target", "atk": "target", "attack": "target",
     "def": "defend", "defend": "defend",
     "rep": "repair", "repair": "repair",
     "ins": "inspect", "inspect": "inspect",
@@ -524,7 +516,7 @@ class Game:
         self.bridge.send_attack_result(system, success, orig_seq)
 
         if success and system == "kernel":
-            self._declare_loss("kernel")
+            self._declare_loss("kernel failure")
 
     def _roll_attack_success(self, system: str, now: float) -> bool:
         base = FIREWALL_BASE_SUCCESS[self.my.firewall.value]
@@ -554,11 +546,6 @@ class Game:
         orig_seq = event.seq
 
         if requested_system is not None and requested_system not in ALL_ATTACKABLE:
-            self.bridge.send_inspect_response({}, orig_seq, blocked=True)
-            return
-
-        block_chance = INSPECT_BLOCK_CHANCE[self.my.firewall.value]
-        if self._rng.random() < block_chance:
             self.bridge.send_inspect_response({}, orig_seq, blocked=True)
             return
 
