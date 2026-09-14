@@ -8,14 +8,11 @@ to import switch_net directly, everything it needs goes through
 NetBridge.
 
 Design notes:
-- Payloads are JSON, with a 4-byte CRC32 prepended before sending. The
-  CRC lets a *receiver* detect a corrupted frame before ever decoding
-  or applying it, rather than finding out after the fact. A corrupted
-  frame is dropped outright: not decoded, not dedup-tracked, not
-  handed to the game as an event. That's what keeps both sides in
-  sync despite an error, both machines end up agreeing the event
-  didn't happen, instead of one applying corrupted data the other
-  never saw.
+- Payloads are JSON, with a 4-byte CRC32 prepended before sending. Normal
+  transport corruption is rejected by that CRC. The game can additionally
+  model an ARP-cache-corrupted attack as a valid but altered JSON payload;
+  an altered payload that cannot be decoded is rejected instead. Reliable
+  game-over messages are never altered by this mechanic.
 - Every non-ack send is tracked in a pending-ack table and acked by
   the receiver (ok=true if the checksum passed, ok=false if it
   didn't). If an ack explicitly says ok=false, that's a confirmed
@@ -43,13 +40,17 @@ Design notes:
 """
 
 import json
+import random
 import struct
 import time
 import zlib
 from dataclasses import dataclass, field
 from typing import Optional
 
-import switch_net
+try:
+    import switch_net
+except ModuleNotFoundError:  # Allows state.py unit tests without the extension.
+    switch_net = None
 
 # -------- game message types --------
 # These are switch_net's msg_type byte (0-255), scoped to this game.
@@ -63,6 +64,9 @@ MSG_GAME_OVER = 14
 MSG_ACK = 15  # not in _EVENT_NAMES: acks are consumed internally by
               # poll(), never handed out as a plain NetEvent
 MSG_ACK_RESEND_REQUEST = 16  # also internal-only, see _handle_ack_resend_request
+MSG_ATTACK_RESULT = 17
+MSG_INSPECT_REQUEST = 18
+MSG_INSPECT_RESPONSE = 19
 
 # How long a receiver remembers "here's the ack I sent for seq N",
 # so it can answer a resend request if the original ack got lost.
@@ -76,6 +80,9 @@ _EVENT_NAMES = {
     MSG_REPAIR: "repair",
     MSG_SYNC: "sync",
     MSG_GAME_OVER: "game_over",
+    MSG_ATTACK_RESULT: "attack_result",
+    MSG_INSPECT_REQUEST: "inspect_request",
+    MSG_INSPECT_RESPONSE: "inspect_response",
 }
 
 # Message types the bridge automatically retries (same seq) on a
@@ -119,6 +126,7 @@ class NetBridge:
     peer_mac: Optional[str] = None
     read_timeout_ms: int = 5
     ack_timeout_ms: int = 125  # generous for a direct LAN link; tune down once tested
+    self_corruption_chance: float = 0.0
 
     _sock: "switch_net.SwitchSocket" = field(init=False, repr=False)
     _last_seq_seen: dict = field(default_factory=dict, init=False, repr=False)
@@ -126,6 +134,8 @@ class NetBridge:
     _recent_acks: dict = field(default_factory=dict, init=False, repr=False)  # seq -> (ok, timestamp)
 
     def __post_init__(self):
+        if switch_net is None:
+            raise RuntimeError("switch_net extension is required to create NetBridge")
         self._sock = switch_net.SwitchSocket(
             self.interface, peer_mac=self.peer_mac, read_timeout_ms=self.read_timeout_ms
         )
@@ -175,8 +185,24 @@ class NetBridge:
 
     # -------- sending --------
 
-    def send_attack(self, exploit: str, system: str) -> int:
-        return self._send(MSG_ATTACK, {"exploit": exploit, "system": system})
+    def send_attack(self, system: str) -> int:
+        return self._send(MSG_ATTACK, {"system": system})
+
+    def send_attack_result(
+        self, system: str, success: bool, orig_seq: int, honeypot_hit: bool = False
+    ) -> int:
+        return self._send(MSG_ATTACK_RESULT, {
+            "system": system, "success": success, "orig_seq": orig_seq,
+            "honeypot_hit": honeypot_hit,
+        })
+
+    def send_inspect_request(self, system: Optional[str]) -> int:
+        return self._send(MSG_INSPECT_REQUEST, {"system": system})
+
+    def send_inspect_response(self, systems: dict, orig_seq: int, blocked: bool = False) -> int:
+        return self._send(MSG_INSPECT_RESPONSE, {
+            "systems": systems, "orig_seq": orig_seq, "blocked": blocked,
+        })
 
     def send_repair(self, system: str) -> int:
         return self._send(MSG_REPAIR, {"system": system})
@@ -184,11 +210,14 @@ class NetBridge:
     def send_sync(self, state: dict) -> int:
         return self._send(MSG_SYNC, state)
 
-    def send_game_over(self, winner: str) -> int:
-        return self._send(MSG_GAME_OVER, {"winner": winner})
+    def send_game_over(self, reason: str, compromised_count: Optional[int] = None) -> int:
+        data = {"reason": reason}
+        if compromised_count is not None:
+            data["compromised_count"] = compromised_count
+        return self._send(MSG_GAME_OVER, data)
 
     def _send(self, msg_type: int, data: dict) -> int:
-        seq = self._sock.send_auto(msg_type, _pack_payload(data))
+        seq = self._sock.send_auto(msg_type, self._wire_payload(msg_type, data))
         self._pending[seq] = _PendingSend(
             msg_type=msg_type,
             system=data.get("system"),
@@ -223,10 +252,35 @@ class NetBridge:
             del self._recent_acks[seq]
 
     def _retry_send(self, seq: int, pending: _PendingSend) -> None:
-        self._sock.send(pending.msg_type, seq, _pack_payload(pending.data))
+        self._sock.send(pending.msg_type, seq, self._wire_payload(pending.msg_type, pending.data))
         pending.sent_time = time.monotonic()
         pending.retry_count += 1
         pending.awaiting_ack_resend = False  # fresh attempt, restart its own two-phase check
+
+    def _wire_payload(self, msg_type: int, data: dict) -> bytes:
+        # ARP-cache corruption is a game mechanic for attacks only.  Keep the
+        # CRC valid when a randomly altered JSON body remains decodable; this
+        # models a corrupted-but-parseable frame rather than turning every
+        # corruption into a simple dropped packet.  Reliable game-over frames
+        # are never corrupted.
+        if (
+            msg_type == MSG_ATTACK
+            and self.self_corruption_chance > 0
+            and random.random() < self.self_corruption_chance
+        ):
+            body = bytearray(json.dumps(data).encode("utf-8"))
+            if body:
+                body[random.randrange(len(body))] ^= 0x01
+                try:
+                    corrupted = json.loads(body.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    corrupted = None
+                if isinstance(corrupted, dict):
+                    return _pack_payload(corrupted)
+                # An undecodable corrupted frame is still sent with its
+                # original CRC framing, so the receiver rejects it.
+                return struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF) + bytes(body)
+        return _pack_payload(data)
 
     # -------- receiving --------
 
