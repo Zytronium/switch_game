@@ -39,6 +39,7 @@ Design notes:
   duplicate successfully-delivered frame can't stomp a newer one.
 """
 
+import errno
 import json
 import random
 import struct
@@ -284,6 +285,30 @@ class NetBridge:
 
     # -------- receiving --------
 
+    @staticmethod
+    def _is_interrupted_receive(exc: OSError) -> bool:
+        """Recognize EINTR from both current and older native extensions."""
+        if exc.errno == errno.EINTR or isinstance(exc, InterruptedError):
+            return True
+
+        # Older builds of switch_net wrap the native error in a formatted
+        # string, which means PyO3 cannot populate OSError.errno. Keep this
+        # narrow so genuine receive failures still reach the caller.
+        message = str(exc).lower()
+        return (
+            "interrupted system call" in message
+            or "(os error 4)" in message
+        )
+
+    def _recv(self):
+        """Read one frame, retrying if terminal resizing interrupted it."""
+        while True:
+            try:
+                return self._sock.recv()
+            except OSError as exc:
+                if not self._is_interrupted_receive(exc):
+                    raise
+
     def poll(self) -> list:
         """
         Drain every frame currently available, ack whatever needs
@@ -295,7 +320,7 @@ class NetBridge:
         self._prune_recent_acks()
 
         while True:
-            result = self._sock.recv()
+            result = self._recv()
             if result is None:
                 break
             msg_type, seq, raw_payload, src_mac = result

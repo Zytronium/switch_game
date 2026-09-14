@@ -58,6 +58,10 @@ fn find_interface(name: &str) -> PyResult<NetworkInterface> {
         })
 }
 
+fn recv_error_is_interrupted(error: &std::io::Error) -> bool {
+    error.kind() == std::io::ErrorKind::Interrupted
+}
+
 // -------- public functions --------
 
 /// List available network interfaces as (name, mac_address) tuples.
@@ -226,6 +230,12 @@ impl SwitchSocket {
             let packet_bytes = match rx.next() {
                 Ok(bytes) => bytes,
                 Err(e) => {
+                    // Resizing a terminal can deliver a signal while this
+                    // receive is blocked. Retry the read instead of exposing
+                    // the resulting EINTR to Python as a socket failure.
+                    if recv_error_is_interrupted(&e) {
+                        continue;
+                    }
                     // A read timeout surfaces as a WouldBlock / TimedOut
                     // io::Error on every platform pnet supports; treat it
                     // as "nothing arrived yet" rather than a hard error.
