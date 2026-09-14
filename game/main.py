@@ -2,6 +2,7 @@
 
 import argparse
 import curses
+import re
 import sys
 import time
 import textwrap
@@ -31,6 +32,22 @@ COMMAND_COMPLETIONS = (
     "ins", "inspect", "pot", "quit", "rep", "repair", "tar", "target",
 )
 SYSTEM_COMPLETIONS = ("antivirus", "arp_cache", "firewall", "kernel", "routing_table", "terminal")
+
+COLOR_PAIRS = {
+    "green": 1,
+    "yellow": 2,
+    "red": 3,
+    "blue": 4,
+    "gray": 5,
+    "cyan": 6,
+}
+STATUS_COLORS = {
+    "operational": "green",
+    "degraded": "yellow",
+    "compromised": "red",
+}
+_STATUS_PATTERN = re.compile(r"\b(operational|degraded|compromised)\b", re.IGNORECASE)
+_COLORS_READY = False
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -63,6 +80,79 @@ def _safe_add(window: "curses.window", y: int, x: int, text: str, width: int,
         window.addnstr(y, max(0, x), text, max(0, width), attr)
     except curses.error:
         pass
+
+
+def _init_colors() -> None:
+    """Set up the small, semantic palette used by the dashboard."""
+    global _COLORS_READY
+    if _COLORS_READY or not curses.has_colors():
+        return
+    try:
+        curses.start_color()
+        if hasattr(curses, "use_default_colors"):
+            curses.use_default_colors()
+        curses.init_pair(COLOR_PAIRS["green"], curses.COLOR_GREEN, -1)
+        curses.init_pair(COLOR_PAIRS["yellow"], curses.COLOR_YELLOW, -1)
+        curses.init_pair(COLOR_PAIRS["red"], curses.COLOR_RED, -1)
+        curses.init_pair(COLOR_PAIRS["blue"], curses.COLOR_BLUE, -1)
+        curses.init_pair(COLOR_PAIRS["gray"], curses.COLOR_WHITE, -1)
+        curses.init_pair(COLOR_PAIRS["cyan"], curses.COLOR_CYAN, -1)
+        _COLORS_READY = True
+    except curses.error:
+        # Monochrome terminals still get the complete, usable UI.
+        _COLORS_READY = False
+
+
+def _color_attr(color: str, extra: int = 0) -> int:
+    if not _COLORS_READY:
+        return extra
+    return curses.color_pair(COLOR_PAIRS[color]) | extra
+
+
+def _default_attr(game: Game) -> int:
+    """Use gray for otherwise-uncolored UI when the local terminal is compromised."""
+    if game.my.terminal.value == "compromised":
+        return _color_attr("gray", curses.A_DIM)
+    return 0
+
+
+def _line_attr(line: str, game: Game) -> int:
+    if line.startswith("!") or "failed" in line.lower():
+        return _color_attr("red")
+    if line.startswith("GAME OVER"):
+        if game.winner == "you":
+            return _color_attr("green", curses.A_BOLD)
+        if game.winner == "opponent":
+            return _color_attr("red", curses.A_BOLD)
+    if "succeeded" in line.lower() or "repaired" in line.lower():
+        return _color_attr("green")
+    return _default_attr(game)
+
+
+def _add_log_line(window: "curses.window", y: int, x: int, line: str,
+                  width: int, game: Game) -> None:
+    """Render a log line, coloring inspection status values individually."""
+    line_attr = _line_attr(line, game)
+    position = 0
+    remaining = width
+    for match in _STATUS_PATTERN.finditer(line):
+        if remaining <= 0:
+            break
+        prefix = line[position:match.start()]
+        if prefix:
+            _safe_add(window, y, x, prefix, min(len(prefix), remaining), line_attr)
+            x += len(prefix)
+            remaining -= len(prefix)
+        if remaining <= 0:
+            break
+        value = match.group(1)
+        attr = _color_attr(STATUS_COLORS[value.lower()])
+        _safe_add(window, y, x, value, min(len(value), remaining), attr)
+        x += len(value)
+        remaining -= len(value)
+        position = match.end()
+    if remaining > 0 and position < len(line):
+        _safe_add(window, y, x, line[position:], remaining, line_attr)
 
 
 def _status_bar(status: "object") -> str:
@@ -113,62 +203,82 @@ def _render(screen: "curses.window", game: Game, command: str,
     inner = width - 2
     half_left = inner // 2
     half_right = inner - half_left
-    _safe_add(screen, 0, 0, "╔" + "═" * (width - 2) + "╗", width)
-    _safe_add(screen, 1, 0, "║", width)
-    _safe_add(screen, 1, 2, warning, width - 2, curses.A_BOLD | curses.A_BLINK)
-    _safe_add(screen, 1, max(2, width - len(title) - 3), title, width - 1, curses.A_BOLD)
-    _safe_add(screen, 1, width - 1, "║", width)
-    _safe_add(screen, 2, 0, "╠" + "═" * half_left + "╦" + "═" * (half_right - 1) + "╣", width)
+    default_attr = _default_attr(game)
+    _safe_add(screen, 0, 0, "╔" + "═" * (width - 2) + "╗", width, default_attr)
+    _safe_add(screen, 1, 0, "║", width, default_attr)
+    _safe_add(screen, 1, 2, warning, width - 2,
+              _color_attr("yellow", curses.A_BOLD | curses.A_BLINK) if warning else default_attr)
+    _safe_add(screen, 1, max(2, width - len(title) - 3), title, width - 1,
+              default_attr | curses.A_BOLD)
+    _safe_add(screen, 1, width - 1, "║", width, default_attr)
+    _safe_add(screen, 2, 0, "╠" + "═" * half_left + "╦" + "═" * (half_right - 1) + "╣", width,
+              default_attr)
 
     left_width = max(30, width // 2)
     divider = min(width - 2, left_width)
     for row in range(3, height - 2):
-        _safe_add(screen, row, 0, "║", width)
-        _safe_add(screen, row, divider, "║", width)
-        _safe_add(screen, row, width - 1, "║", width)
+        _safe_add(screen, row, 0, "║", width, default_attr)
+        _safe_add(screen, row, divider, "║", width, default_attr)
+        _safe_add(screen, row, width - 1, "║", width, default_attr)
 
-    _safe_add(screen, 4, divider + 2, "SYSTEM STATUS", width - divider - 2, curses.A_BOLD)
+    _safe_add(screen, 4, divider + 2, "SYSTEM STATUS", width - divider - 2,
+              default_attr | curses.A_BOLD)
     systems = ("firewall", "antivirus", "routing_table", "arp_cache", "terminal", "kernel")
     for index, system in enumerate(systems):
         row = 6 + index * 2
         status = ("compromised" if game.my.kernel_compromised else "operational") \
             if system == "kernel" else game.my.get(system)
         label = SYSTEM_LABELS[system]
-        _safe_add(screen, row, divider + 2, f"{label:<14} {_status_bar(status)}",
-                  width - divider - 3)
+        status_value = getattr(status, "value", str(status))
+        _safe_add(screen, row, divider + 2, f"{label:<14} ", width - divider - 3, default_attr)
+        _safe_add(screen, row, divider + 17, _status_bar(status), width - divider - 18,
+                  _color_attr(STATUS_COLORS[status_value]))
 
     hp_row = 19
     if hp_row < height - 3:
-        _safe_add(screen, hp_row, divider + 2, "HONEYPOT STATUS", width - divider - 2, curses.A_BOLD)
+        _safe_add(screen, hp_row, divider + 2, "HONEYPOT STATUS", width - divider - 2,
+                  default_attr | curses.A_BOLD)
         if game.busy_action == "honeypot":
             hp_text = f"[SETTING UP] {game.busy_target or ''} ({_remaining(game.busy_until, now)})"
         elif game.honeypot_system:
             hp_text = f"[ACTIVE] Masking: {SYSTEM_LABELS.get(game.honeypot_system, game.honeypot_system)}"
         else:
             hp_text = "[INACTIVE]"
-        _safe_add(screen, hp_row + 1, divider + 2, hp_text, width - divider - 3)
+        hp_color = "green" if game.honeypot_system else "cyan"
+        if game.busy_action == "honeypot":
+            hp_color = "yellow"
+        _safe_add(screen, hp_row + 1, divider + 2, hp_text, width - divider - 3,
+                  _color_attr(hp_color))
 
     cooldown_row = min(height - 5, hp_row + 4)
-    _safe_add(screen, cooldown_row, divider + 2, "COOLDOWNS", width - divider - 2, curses.A_BOLD)
+    _safe_add(screen, cooldown_row, divider + 2, "COOLDOWNS", width - divider - 2,
+              default_attr | curses.A_BOLD)
     repair = _remaining(game.busy_until, now) if game.busy_action == "repair" else "READY"
     honeypot = _remaining(game.honeypot_cooldown_until, now)
-    _safe_add(screen, cooldown_row + 1, divider + 2,
-              f"Attack: {_remaining(game.attack_cooldown_until, now):<7} Repair: {repair:<7}",
-              width - divider - 3)
-    _safe_add(screen, cooldown_row + 2, divider + 2, f"Honeypot: {honeypot}", width - divider - 3)
+    attack_text = _remaining(game.attack_cooldown_until, now)
+    repair_text = repair
+    _safe_add(screen, cooldown_row + 1, divider + 2, "Attack: ", width - divider - 3, default_attr)
+    _safe_add(screen, cooldown_row + 1, divider + 10, f"{attack_text:<7}", width - divider - 10,
+              _color_attr("green" if attack_text == "READY" else "yellow"))
+    _safe_add(screen, cooldown_row + 1, divider + 18, "Repair: ", width - divider - 18, default_attr)
+    _safe_add(screen, cooldown_row + 1, divider + 26, f"{repair_text:<7}", width - divider - 26,
+              _color_attr("green" if repair_text == "READY" else "yellow"))
+    _safe_add(screen, cooldown_row + 2, divider + 2, "Honeypot: ", width - divider - 3, default_attr)
+    _safe_add(screen, cooldown_row + 2, divider + 12, honeypot, width - divider - 12,
+              _color_attr("green" if honeypot == "READY" else "yellow"))
 
     log_top = 4
     log_bottom = height - 4
     visible = _wrap_log(game.log, divider - 3, log_bottom - log_top)
     for row, line in enumerate(visible, log_top):
-        _safe_add(screen, row, 2, line, divider - 3)
+        _add_log_line(screen, row, 2, line, divider - 3, game)
 
-    _safe_add(screen, height - 3, 0, "║" + " " * half_left + "╚" + "═" * (half_right - 1) + "╣", width)
+    _safe_add(screen, height - 3, 0, "║" + " " * half_left + "╚" + "═" * (half_right - 1) + "╣", width, default_attr)
     prompt = "> " + command
-    _safe_add(screen, height - 2, 0, "║", width)
-    _safe_add(screen, height - 2, 2, prompt, width - 3)
-    _safe_add(screen, height - 2, width - 1, "║", width)
-    _safe_add(screen, height - 1, 0, "╚" + "═" * (width - 2) + "╝", width)
+    _safe_add(screen, height - 2, 0, "║", width, default_attr)
+    _safe_add(screen, height - 2, 2, prompt, width - 3, default_attr)
+    _safe_add(screen, height - 2, width - 1, "║", width, default_attr)
+    _safe_add(screen, height - 1, 0, "╚" + "═" * (width - 2) + "╝", width, default_attr)
 
     # Keep the cursor in the input box, even when the command is wider than it.
     cursor_x = min(width - 2, 4 + cursor)
@@ -236,6 +346,7 @@ def _delete_previous_word(command: str, cursor: int) -> tuple[str, int]:
 
 
 def _run_ui(screen: "curses.window", game: Game) -> int:
+    _init_colors()
     curses.curs_set(1)
     curses.noecho()
     curses.cbreak()
