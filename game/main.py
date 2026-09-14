@@ -110,12 +110,15 @@ def _render(screen: "curses.window", game: Game, command: str,
 
     warning = "[WARNING] INCOMING ATTACK DETECTED!" if game.warning_until > now else ""
     title = "SWITCH 'n HACK v1.0"
+    inner = width - 2
+    half_left = inner // 2
+    half_right = inner - half_left
     _safe_add(screen, 0, 0, "╔" + "═" * (width - 2) + "╗", width)
     _safe_add(screen, 1, 0, "║", width)
     _safe_add(screen, 1, 2, warning, width - 2, curses.A_BOLD | curses.A_BLINK)
     _safe_add(screen, 1, max(2, width - len(title) - 3), title, width - 1, curses.A_BOLD)
     _safe_add(screen, 1, width - 1, "║", width)
-    _safe_add(screen, 2, 0, "╠" + "═" * (int((width - 2) / 2)) + "╦" + "═" * int((width - 2) / 2) + "╣", width)
+    _safe_add(screen, 2, 0, "╠" + "═" * half_left + "╦" + "═" * (half_right - 1) + "╣", width)
 
     left_width = max(30, width // 2)
     divider = min(width - 2, left_width)
@@ -160,7 +163,7 @@ def _render(screen: "curses.window", game: Game, command: str,
     for row, line in enumerate(visible, log_top):
         _safe_add(screen, row, 2, line, divider - 3)
 
-    _safe_add(screen, height - 3, 0, "║" + " " * int((width - 2) / 2) + "╚" + "═" * int((width - 2) / 2) + "╣", width)
+    _safe_add(screen, height - 3, 0, "║" + " " * half_left + "╚" + "═" * (half_right - 1) + "╣", width)
     prompt = "> " + command
     _safe_add(screen, height - 2, 0, "║", width)
     _safe_add(screen, height - 2, 2, prompt, width - 3)
