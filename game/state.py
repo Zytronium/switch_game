@@ -375,7 +375,6 @@ class Game:
             self.phase = "game_over"
             self.winner = "you"
             self.game_over_reason = "forfeit"
-            self._log("> tar kernel")
             self._log("GAME OVER - you win! (final blow after opponent forfeited)")
             return
 
@@ -395,7 +394,6 @@ class Game:
         seq = self.bridge.send_attack(actual_system)
         self.pending_attacks[seq] = PendingAttack(system=actual_system, sent_time=now)
         self.attack_cooldown_until = now + ATTACK_COOLDOWN_S
-        self._log(f"> tar {system}")
 
     def _opponent_target_valid(self, system: str) -> bool:
         """Return whether a target is currently known to be unlocked."""
@@ -421,7 +419,6 @@ class Game:
             return
         self.defended_system = system
         self.defended_until = now + DEFEND_WINDOW_S
-        self._log(f"> def {system}")
 
     def _cmd_repair(self, system: str, now: float) -> None:
         if system not in ALL_ATTACKABLE or system == "kernel":
@@ -433,7 +430,6 @@ class Game:
         self.busy_until = now + REPAIR_DURATION_S
         self.busy_action = "repair"
         self.busy_target = system
-        self._log(f"> rep {system} (10s)")
 
     def _cmd_inspect(self, system: Optional[str], now: float) -> None:
         if system is not None and system not in ALL_ATTACKABLE:
@@ -441,7 +437,6 @@ class Game:
             return
         seq = self.bridge.send_inspect_request(system)
         self.pending_inspects[seq] = PendingInspect(system=system, sent_time=now)
-        self._log(f"> ins {system or ''}".rstrip())
 
     def _cmd_honeypot(self, system: str, now: float) -> None:
         if system not in BASE_SYSTEMS:
@@ -456,7 +451,6 @@ class Game:
         self.busy_until = now + HONEYPOT_SETUP_DURATION_S
         self.busy_action = "honeypot"
         self.busy_target = system
-        self._log(f"> pot {system} (10s)")
 
     def _cmd_forfeit(self) -> None:
         if not self.awaiting_forfeit_confirm:

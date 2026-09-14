@@ -279,12 +279,12 @@ def _run_ui(screen: "curses.window", game: Game) -> int:
                 submitted = command
                 if submitted.strip():
                     history.append(submitted)
-                    game_log_before = len(game.log)
+                    # Record every submitted command before handling it.  Some
+                    # commands are rejected without any state-side command
+                    # log (for example while the terminal is locked), but
+                    # they still belong in the visible command history.
+                    game.log.append("> " + submitted)
                     game.handle_command(submitted)
-                    # State logs accepted commands. Add rejected/empty-result
-                    # commands so the dashboard still behaves like a CLI.
-                    if len(game.log) == game_log_before:
-                        game.log.append("> " + submitted.strip())
                     history_index = None
                 command = ""
                 cursor = 0
