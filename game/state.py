@@ -26,7 +26,7 @@ to correctly resolve an incoming attack. So:
   status via a successful, unblocked inspect, a deliberate
   fog-of-war choice, not an oversight.
 - "game_over" for a kernel compromise or a forfeit is always sent by
-  the LOSING side, self-reporting its own loss ({"reason": "kernel"}
+  the LOSING side, self-reporting its own loss ({"reason": "kernel failure"}
   or {"reason": "forfeit"}), so there's no relative "you"/"opponent"
   ambiguity to get backwards, whoever sends it just lost.
 - The 10-minute timeout is different: neither side knows the winner
@@ -585,7 +585,7 @@ class Game:
 
     def _handle_incoming_game_over(self, event: "net_bridge.NetEvent") -> None:
         reason = event.data.get("reason")
-        if reason in ("kernel", "forfeit"):
+        if reason in ("kernel failure", "forfeit"):
             if reason == "forfeit":
                 self.opponent_forfeited = True
                 self.known_opponent.update({s: Status.COMPROMISED.value for s in BASE_SYSTEMS})
@@ -594,8 +594,8 @@ class Game:
             else:
                 self.phase = "game_over"
                 self.winner = "you"
-                self.game_over_reason = reason
-                self._log(f"GAME OVER - you win! (opponent: {reason})")
+                self.game_over_reason = "kernel failure"
+                self._log("GAME OVER - you win! (opponent: kernel failure)")
         elif reason == "timeout":
             if not self._final_tally_sent:
                 self._my_final_tally = self.my.compromised_count()
