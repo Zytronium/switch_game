@@ -199,7 +199,7 @@ def _render(screen: "curses.window", game: Game, command: str,
         return
 
     warning = "[WARNING] INCOMING ATTACK DETECTED!" if game.warning_until > now else ""
-    title = "SWITCH 'n HACK v1.0"
+    title = "SWITCH 'n HACK"
     inner = width - 2
     half_left = inner // 2
     half_right = inner - half_left
