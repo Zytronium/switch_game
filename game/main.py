@@ -114,6 +114,7 @@ def _render(screen: "curses.window", game: Game, command: str,
     _safe_add(screen, 1, 0, "║", width)
     _safe_add(screen, 1, 2, warning, width - 2, curses.A_BOLD | curses.A_BLINK)
     _safe_add(screen, 1, max(2, width - len(title) - 3), title, width - 1, curses.A_BOLD)
+    _safe_add(screen, 1, width - 1, "║", width)
     _safe_add(screen, 2, 0, "╠" + "═" * (width - 2) + "╣", width)
 
     left_width = max(30, width // 2)
