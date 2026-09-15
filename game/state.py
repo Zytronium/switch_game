@@ -21,9 +21,6 @@ HONEYPOT_LOCKOUT = 5.0
 TERMINAL_LOCKOUT = 30.0
 MATCH_DURATION = 900.0 # 15 Min
 WARNING_BANNER_DURATION = 3.0
-ATTACK_RESULT_WAIT = 0.1
-INSPECT_RESULT_WAIT = 0.1
-
 # Logging
 LOG_MAX_LINES = 255
 
@@ -214,7 +211,6 @@ class Game:
             if self.phase == "game_over":
                 return
 
-            self._check_pending_timeouts(now)
             self._resolve_busy_action(now)
             self._check_match_timer(now)
 
@@ -225,7 +221,6 @@ class Game:
             new_status = self.my.get(self.busy_target).better()
             self.my.set(self.busy_target, new_status)
             self._log(f"repair complete: {self.busy_target}: {new_status.value}")
-            self._log(f"repair complete: {self.busy_target}: {new_status.value}")
         elif self.busy_action == "honeypot":
             self.honeypot_system = self.busy_target
             self.honeypot_cooldown_until = now + HONEYPOT_COOLDOWN
@@ -234,14 +229,6 @@ class Game:
         self.busy_action = None
         self.busy_target = None
 
-    def _check_pending_timeouts(self, now: float) -> None:
-        for seq, pa in list(self.pending_attacks.items()):
-            if now - pa.sent_time > ATTACK_RESULT_WAIT:
-                self._log("[!] failed! (attack frame lost in transit)")
-                del self.pending_attacks[seq]
-        for seq, pi in list(self.pending_inspects.items()):
-            if now - pi.sent_time > INSPECT_RESULT_WAIT:
-                self._log("[!] failed! (inspect frame lost in transit)")
 
     def _check_match_timer(self, now: float) -> None:
         if self._final_tally_sent or self.start_time is None:
@@ -335,6 +322,19 @@ class Game:
             self._cmd_help()
         elif action == "forfeit":
             self._cmd_forfeit()
+
+    def _cmd_forfeit(self) -> None:
+        if not self.awaiting_forfeit_confirm:
+            self.awaiting_forfeit_confirm = True
+            self._log("[!] forfeit? Enter forfeit again to confirm")
+            return
+
+        self.bridge.send_game_over("forfeit")
+        self.phase = "game_over"
+        self.winner = "opponent"
+        self.game_over_reason = "forfeit"
+        self.awaiting_forfeit_confirm = False
+        self._log("GAME OVER - You forfeit")
             
     def _opponent_target_valid(self, system: str) -> bool:
         if system in BASE_SYSTEMS:
@@ -442,6 +442,11 @@ class Game:
             self._handle_inspect_response(event)
         elif event.type == "game_over":
             self._handle_incoming_game_over(event)
+        elif event.type == "delivered":
+            # NetBridge owns delivery tracking. A successful acknowledgement
+            # must not be treated as a game result; the corresponding result
+            # frame may arrive separately and later.
+            pass
         elif event.type == "delivery_failed":
             self._handle_delivery_failed(event)
 
