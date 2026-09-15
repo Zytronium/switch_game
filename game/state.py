@@ -433,7 +433,7 @@ class Game:
 
     def _handle_event(self, event: "net_bridge.NetEvent", now: float) -> None:
         if event.type == "attack":
-            self._handle_incomming_attack(event, now)
+            self._handle_incoming_attack(event, now)
         elif event.type == "attack_result":
             self._handle_attack_result(event)
         elif event.type == "inspect_request":
