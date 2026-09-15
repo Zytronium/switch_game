@@ -211,10 +211,10 @@ class NetBridge:
     def send_sync(self, state: dict) -> int:
         return self._send(MSG_SYNC, state)
 
-    def send_game_over(self, reason: str, compromised_count: Optional[int] = None) -> int:
+    def send_game_over(self, reason: str, damage_score: Optional[int] = None) -> int:
         data = {"reason": reason}
-        if compromised_count is not None:
-            data["compromised_count"] = compromised_count
+        if damage_score is not None:
+            data["damage_score"] = damage_score
         return self._send(MSG_GAME_OVER, data)
 
     def _send(self, msg_type: int, data: dict) -> int:

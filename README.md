@@ -5,7 +5,8 @@ Switch 'n Hack is a two-player game where both players connect each other's comp
 cables, then use custom CLI commands to try to hack the other player (only simulated hacks, actual device security will
 not be compromised). Each player may run commands to play offensive or defensive moves or to repair sabotage done by the
 other player. The first player to fully compromise all the other player's systems, rendering their interface fully
-unusable, wins. If the game lasts more than 10 minutes, the player with the fewest compromised systems wins.
+unusable, wins. If the game lasts more than 15 minutes, the player with the fewest compromised and degraded systems 
+wins (compromised systems are worth 3 points while degraded systems are worth 1).
 
 Since this game operates below the TCP layer, there is no guaranteed delivery or error correction. This is a feature,
 not a design flaw. While acknowledgements are required to prevent desync between each client, nothing is re-transmitted
@@ -49,10 +50,10 @@ The Kernel has only two states: Operational or Compromised (game over).
 
 Each player can make the following moves at any time:
 
-1. **Attack a system** - If successful, reduces the opponent's system's status by one level. Cooldown of 1 second.
+1. **Attack a system** - If successful, reduces the opponent's system's status by one level. Cooldown of 2 seconds.
 2. **Defend a system** - If antivirus is not compromised and the opponent tries to attack the specified system in the
    next 5 seconds, the success rate is lowered significantly. Cannot defend more than one system at a time.
-3. **Repair a system** - Spends 10 seconds to increase a system's status by one level. You cannot run any other commands
+3. **Repair a system** - Spends 5 seconds to increase a system's status by one level. You cannot run any other commands
    during this time period.
 4. **Inspect system(s)** - Displays the opponent's status of all systems, optionally specifying a single system to
    inspect instead. Inspections bypass firewalls. Does not reveal honeypots.
@@ -66,43 +67,10 @@ Each player can make the following moves at any time:
 
 | Commands                           | Parameters        | Description                                                                   |
 |------------------------------------|-------------------|-------------------------------------------------------------------------------|
-| `tar`, `target`, `atk` or `attack` | system            | Targets an attack on a specific system                                        |
+| `atk`, `attack`, `tar` or `target` | system            | Targets an attack on a specific system                                        |
 | `def` or `defend`                  | system            | Focuses antivirus on a specific system for 5 seconds                          |
 | `rep` or `repair`                  | system            | Repairs a system by increasing its status by one level                        |
 | `ins` or `inspect`                 | system (optional) | Inspects the status of the opponent's system(s)                               |
 | `pot` or `honeypot`                | system            | Sets up a honeypot system that masks itself as one of the legitimate systems. |
-| `quit`, `exit` or `forfeit`        |                   | Forfeits the game after confirming player is sure they want to forfeit.       |
-
-## UI
-
-The planned UI will look like this:
-
-```
-╔══════════════════════════════════════════════════════════════════════════════════════╗
-║ [WARNING] INCOMING ATTACK DETECTED!                              SWITCH 'n HACK v1.0 ║
-╠════════════════════════╦═════════════════════════════════════════════════════════════╣
-║                        ║  SYSTEM STATUS                                              ║
-║ > tar antivirus        ║                                                             ║
-║ > tar firewall         ║  ╔════════════════╗                                         ║
-║ > def firewall         ║  ║ FIREWALL       ║ [░░░░] COMPROMISED                      ║
-║ > ins                  ║  ╠════════════════╣                                         ║
-║ > rep routing_table    ║  ║ ANTIVIRUS      ║ [██░░] Degraded                         ║
-║ > pot arp_cache        ║  ╠════════════════╣                                         ║
-║ > tar routing_table    ║  ║ ROUTING TABLE  ║ [████] Operational                      ║
-║ ! failed               ║  ╠════════════════╣                                         ║
-║ > tar routing_table    ║  ║ ARP CACHE      ║ [██░░] Degraded                         ║
-║ > def antivirus        ║  ╠════════════════╣                                         ║
-║                        ║  ║ TERMINAL       ║ [████] Operational                      ║
-║                        ║  ╠════════════════╣                                         ║
-║                        ║  ║ KERNEL         ║ [████] Operational                      ║
-║                        ║  ╚════════════════╝                                         ║
-║                        ║                                                             ║
-║                        ║  HONEYPOT STATUS                                            ║
-║                        ║  [ACTIVE] Masking: ARP Cache                                ║
-║                        ║                                                             ║
-║                        ║  COOLDOWNS                                                  ║
-║                        ║  Attack: READY   Repair: READY   Honeypot: 00:53            ║
-║                        ╚═════════════════════════════════════════════════════════════╣
-║ >                                                                                    ║
-╚══════════════════════════════════════════════════════════════════════════════════════╝
-```
+| `pot` or `honeypot`                | system            | Sets up a honeypot system that masks itself as one of the legitimate systems. |
+| `?`, or `help`                     |                   | Displays a list of commands and what they do.                                 |

@@ -1,3 +1,4 @@
 net/target/
 .idea/
 .venv/
+*gitignore-me*

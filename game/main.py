@@ -432,6 +432,8 @@ def _run_ui(screen: "curses.window", game: Game) -> int:
                     cursor = len(command)
             elif 32 <= key <= 126:
                 character = chr(key)
+                if character.isalpha() and not game.can_type_character(character):
+                    continue
                 command = command[:cursor] + character + command[cursor:]
                 cursor += 1
 
