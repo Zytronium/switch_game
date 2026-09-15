@@ -556,7 +556,7 @@ class Game:
                 self.phase = "game_over"
                 self.winner = "you"
                 self.game_over_reason = "kernel failure"
-                self._log("GAME OVER - You win! (opponent kernel compromised)")
+                self._log("GAME OVER - You win! (opponent kernel failed)")
         elif reason == "timeout":
             if not self._final_tally_sent:
                 self._my_final_tally = self.my.calculate_damage_score()
