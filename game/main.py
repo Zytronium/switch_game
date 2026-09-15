@@ -117,13 +117,13 @@ def _default_attr(game: Game) -> int:
 
 
 def _line_attr(line: str, game: Game) -> int:
-    if line.startswith("[!]") or "failed" in line.lower():
-        return _color_attr("red")
     if line.startswith("GAME OVER"):
         if game.winner == "you":
             return _color_attr("green", curses.A_BOLD)
         if game.winner == "opponent":
             return _color_attr("red", curses.A_BOLD)
+    if line.startswith("[!]") or "failed" in line.lower():
+        return _color_attr("red")
     if "succeeded" in line.lower() or "repaired" in line.lower():
         return _color_attr("green")
     return _default_attr(game)
