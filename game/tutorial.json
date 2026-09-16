@@ -1,0 +1,170 @@
+[
+  {
+    "title": "Welcome to the switch game: Switch 'n Hack!",
+    "content": "In this game, which does not work over WiFi and requires an Ethernet switch, two players physically connect via switch and hack each other's systems, trying to compromise the other's interface first. You will attack your opponent's systems while defending, repairing, and boobytrapping your own. If your kernel is compromised, you loose, so your aim is to compromise your opponent's kernel before they compromise yours.",
+    "tips": [
+      "Switch 'n Hack is a realtime strategy game. There are no turns and you must act fast!",
+      "The game timer lasts for 15 minutes. If time runs out before a player can compromise the other's kernel, whoever has taken less damage wins."
+    ],
+    "interactive": false,
+    "next_button": "Press Enter"
+  },
+  {
+    "title": "Your Systems",
+    "content": "You are defending four core systems: Firewall, Antivirus, Routing Table, and ARP Cache. Each has its own function that affects gameplay. These systems start Operational and can be knocked down to Degraded (where their function is, well, degraded), then to Compromised (where they stop functioning). Behind all of them sits the Terminal and the Kernel. If all core systems are compromised, your Terminal interface becomes vulnerable to attack. Once your Terminal is compromised, your Kernel becomes a target. The Kernel is like a popcorn kernel - it's either popped (compromised) or not popped (operational). This means its a one-hit kill.",
+    "tips": [
+      "The first four systems (firewall, antivirus, routing_table, arp_cache) can be attacked at any time.",
+      "Terminal only becomes a valid target once all four core systems are compromised.",
+      "Kernel only becomes a valid target once the Terminal is compromised too."
+    ],
+    "interactive": false,
+    "next_button": "Press Enter"
+  },
+  {
+    "title": "The Firewall",
+    "content": "Your Firewall helps filter out malicious attacks. While your opponent can easily evade the Firewall, it can stop attacks in their tracks. When degraded, the Firewall blocks fewer attacks, and when compromised, it ceases to block any attacks.",
+    "tips": [
+      "While operational, the Firewall blocks 25% of all incoming attacks.",
+      "While degraded, it blocks 10% of incoming attacks.",
+      "While compromised, it blocks nothing."
+    ],
+    "interactive": false,
+    "next_button": "Press Enter"
+  },
+  {
+    "title": "The Antivirus",
+    "content": "Your Antivirus enables you to defend systems (one at a time). While not compromised, it can enhance security on a specific system, making attacks on that system less likely to succeed for several seconds. The Antivirus also warns you of incoming attacks, though it cannot specify which system is being attacked.",
+    "tips": [
+      "When defending while operational, the Antivirus adds a 0.25x multiplier to the success chance of attacks on the defended system.",
+      "When defending while degraded, it adds a 0.15x multiplier to the success chance of attacks on the defended system.",
+      "While compromised, you cannot defend systems period and you get no attack warning alerts."
+    ],
+    "interactive": false,
+    "next_button": "Press Enter"
+  },
+  {
+    "title": "The Routing Table",
+    "content": "Your Routing Table ensures your attacks get routed to the correct system. While technically routing tables in real life route IP addresses (and therefore devices, not subsystems), its a game - don't cry about it please.",
+    "tips": [
+      "While operational, the Routing Table routes 100% of attacks correctly unless actual frame corruption occurs, which is possible by design.",
+      "While degraded, it routes 75% of attacks correctly.",
+      "While compromised, it routes about 33% of attacks correctly, which can be quite annoying."
+    ],
+    "interactive": false,
+    "next_button": "Press Enter"
+  },
+  {
+    "title": "The ARP Cache",
+    "content": "Your ARP Cache helps ensure packets don't get corrupted. (Again, please don't cry about this not being accurate to real life.) If this gets damaged, actual frame corruption can occur more frequently, causing attacks to sometimes fail or even make the wrong move (i.e. repair a system instead of attack it).",
+    "tips": [
+      "While operational, the ARP Cache prevents almost all corruption. Genuine natural corruption can still occur, though extremely rarely.",
+      "While degraded, packets have an additional 10% chance of being corrupted, though this is through artificial means (but it's still genuine corruption, just not caused naturally).",
+      "While compromised, it about 33% of packets will corrupt."
+    ],
+    "interactive": false,
+    "next_button": "Press Enter"
+  },
+  {
+    "title": "The Terminal Interface",
+    "content": "Your Terminal is the command line interface in which you type commands, view system status, and just play the game in general.",
+    "tips": [
+      "The Terminal cannot be attacked unless all previously mentioned systems are compromised.",
+      "While operational, the terminal works fine.",
+      "While degraded, about 33% of keystrokes will not be processed, making it difficult to type commands.",
+      "If you need to exit the game but cannot type 'exit' (or 'quit') because of this, you can press ESC and any other key to exit the program. Or just close your terminal.",
+      "While compromised, the terminal is completely locked for the first 30 seconds, which is plenty of time for you to watch in horror, completely helpless, as your opponent deals the final blow to your Kernel, crashing your system and displaying that terrifying GAME OVER message once and for all! Your mind decompiles, and you learn that it was a dream all alo- this is a tutorial, not a text adventure game. Let's move on."
+    ],
+    "interactive": false,
+    "next_button": "Press Enter"
+  },
+  {
+    "title": "The Kernel",
+    "content": "Your Kernel is the operating system that runs the game. It's the Chess King of Switch 'n Hack. It doesn't do much, but if its gone, its game over. Literally.",
+    "tips": [
+      "The Kernel cannot be attacked unless all previously mentioned systems, including the Terminal, are compromised.",
+      "The Kernel has no real function.",
+      "While operational, you may play the game.",
+      "When compromised, you loose.",
+      "The Kernel has no degraded status. One attack and its game over."
+    ],
+    "interactive": false,
+    "next_button": "Press Enter"
+  },
+  {
+    "title": "Attacking",
+    "content": "Use 'attack <system>' (or 'atk'/'tar'/'target') to strike at one of your opponent's systems. Success isn't guaranteed, it depends on the health of your opponent's Firewall, as well as your ARP Cache. A healthier Firewall on the opponent's side means a lower chance of success, as does a damaged ARP Cache on your end.",
+    "tips": [
+      "Attacks have a short 2-second cooldown between uses.",
+      "A successful attack damages the system by one level: operational to degraded, and degraded to compromised."
+    ],
+    "demo_command": "atk firewall",
+    "interactive": true,
+    "next_button": "Try it: atk firewall"
+  },
+  {
+    "title": "Defending",
+    "content": "Use 'defend <system>' (or 'def') to focus your Antivirus on protecting one system for 5 seconds. While active, incoming attacks on that system are much less likely to succeed, as long as your Antivirus itself isn't compromised.",
+    "tips": [
+      "You can't defend with a compromised Antivirus."
+    ],
+    "demo_command": "def antivirus",
+    "interactive": true,
+    "next_button": "Try it: def antivirus"
+  },
+  {
+    "title": "Repairing",
+    "content": "Use 'repair <system>' (or 'rep') to start fixing a damaged system. Repairs take 5 seconds to complete and lock you out of doing anything else while until the repair is completed.",
+    "tips": [
+      "You can't repair a system that's already fully operational.",
+      "Repair moves a system one level higher: compromised to degraded, and degraded to operational."
+    ],
+    "demo_command": "rep firewall",
+    "interactive": true,
+    "next_button": "Try it: rep firewall"
+  },
+  {
+    "title": "Inspecting",
+    "content": "Use 'inspect' (or 'ins') to check the status of your opponent's systems. Add a system name to check just that one, or leave it blank to get a full list. Your opponent's firewall can't block the request (as that would be an annoying game mechanic).",
+    "tips": [
+      "Inspecting doesn't damage anything, it's a purely informational move.",
+      "Use it before attacking to pick the weakest target."
+    ],
+    "demo_command": "ins firewall",
+    "interactive": true,
+    "next_button": "Try it: ins firewall"
+  },
+  {
+    "title": "Honeypots",
+    "content": "Use 'honeypot <system>' (or 'pot') to disguise and boobytrap one of your core systems. It takes 10 seconds to set up, and once it's live, any attack aimed at that system fails, disables the honeypot, and temporarily locks out your opponent.",
+    "tips": [
+      "Honeypots have a minute-long cooldown after use before you can set another, and only last for a minute if not tripped.",
+      "An inspecting opponent will see the honeypot system as operational, not its real status, but will not see that it's a honeypot."
+    ],
+    "demo_command": "pot arp_cache",
+    "interactive": true,
+    "next_button": "Try it: pot arp_cache"
+  },
+  {
+    "title": "Forfeiting",
+    "content": "If you need to give up, use 'forfeit' (or 'exit'/'quit'). You'll be asked to confirm by entering it a second time before the match actually ends. A forfeit counts as a loss.",
+    "tips": [
+      "Any other command cancels a pending forfeit confirmation.",
+      "To avoid depriving your opponent of a win, from their perspective, all your systems become compromised and they are permitted a final blow to your Kernel as a victory lap."
+    ],
+    "interactive": false,
+    "next_button": "Press Enter"
+  },
+  {
+    "title": "Help",
+    "content": "Type 'help' (or '?') during a match to see the full list of commands and their aliases without leaving the game.",
+    "demo_command": "help",
+    "interactive": true,
+    "next_button": "Try it: help"
+  },
+  {
+    "title": "Your ready to start hacking!",
+    "content": "That's everything you need to know! Now go hack your opponent to death or find an exploit to cheat your way across that Ethernet wire. This is the wild west of cyber security, anything is possible. Have fun!",
+    "interactive": false,
+    "next_button": "End tutorial"
+  }
+]

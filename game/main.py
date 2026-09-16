@@ -2,10 +2,13 @@
 
 import argparse
 import curses
+import json
+import os
 import re
 import sys
 import time
 import textwrap
+from pathlib import Path
 from typing import Optional, Sequence
 
 try:  # Package execution: ``python -m game.main``.
@@ -48,6 +51,45 @@ STATUS_COLORS = {
 }
 _STATUS_PATTERN = re.compile(r"\b(operational|degraded|compromised)\b", re.IGNORECASE)
 _COLORS_READY = False
+CONFIG_PATH = Path.home() / "switch_n_hack" / "config.json"
+
+
+def _get_config_path() -> Path:
+    """Return the per-user configuration path."""
+    return Path(os.path.expanduser("~/switch_n_hack/config.json"))
+
+
+def _load_config(config_path: Optional[Path] = None) -> dict:
+    """Load configuration, falling back to an unseen tutorial."""
+    path = config_path or _get_config_path()
+    try:
+        with path.open(encoding="utf-8") as config_file:
+            config = json.load(config_file)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {"seen_tutorial": False}
+
+    if not isinstance(config, dict):
+        return {"seen_tutorial": False}
+    if "seen_tutorial" not in config:
+        config["seen_tutorial"] = False
+    return config
+
+
+def _save_config(config_dict: dict, config_path: Optional[Path] = None) -> None:
+    """Persist configuration without preventing the game from starting."""
+    path = config_path or _get_config_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as config_file:
+            json.dump(config_dict, config_file, indent=2)
+            config_file.write("\n")
+    except (OSError, TypeError, ValueError) as exc:
+        print(f"Warning: unable to save configuration: {exc}", file=sys.stderr)
+
+
+def ensure_config(config_path: Path = CONFIG_PATH) -> None:
+    """Ensure the tutorial marker exists without changing its current value."""
+    _save_config(_load_config(config_path), config_path)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -67,7 +109,31 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="MILLISECONDS",
         help="how long to wait for the other player (default: 10000)",
     )
+    parser.add_argument(
+        "--tutorial",
+        action="store_true",
+        help="Play tutorial")
     return parser
+
+
+def _show_tutorial(screen: "curses.window") -> None:
+    """Display the short first-run introduction and wait for acknowledgement."""
+    screen.erase()
+    lines = (
+        "SWITCH 'n HACK",
+        "",
+        "Attack, defend, repair, inspect, and set honeypots using commands.",
+        "The first player to compromise the opponent's kernel wins.",
+        "",
+        "Press any key to continue.",
+    )
+    for row, line in enumerate(lines):
+        try:
+            screen.addstr(row, 0, line)
+        except curses.error:
+            pass
+    screen.refresh()
+    screen.getch()
 
 
 def _safe_add(window: "curses.window", y: int, x: int, text: str, width: int,
@@ -455,8 +521,15 @@ def run(
     peer_mac: Optional[str] = None,
     connect_timeout_ms: int = 10000,
     tick_interval_s: float = FRAME_INTERVAL_S,
+    tutorial: bool = False,
 ) -> int:
     """Connect and run the 60 FPS terminal dashboard."""
+    config = _load_config()
+    if tutorial or not config.get("seen_tutorial", False):
+        curses.wrapper(_show_tutorial)
+        config["seen_tutorial"] = True
+        _save_config(config)
+
     bridge = NetBridge(interface=interface, peer_mac=peer_mac)
     game = Game(bridge)
 
@@ -479,6 +552,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             interface=args.interface,
             peer_mac=args.peer_mac,
             connect_timeout_ms=args.connect_timeout,
+            tutorial=args.tutorial,
         )
     except KeyboardInterrupt:
         print("\nExiting.", flush=True)
