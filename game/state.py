@@ -31,9 +31,9 @@ FIREWALL_BASE_SUCCESS = { # Firewall
     "compromised": 1.0
 }
 DEFEND_SUCCESS_MULTIPLIER = { # Antivirus
-    "operational": 0.25,
-    "degraded": 0.15,
-    "compromised": 0.0
+    "operational": 0.75,
+    "degraded": 0.85,
+    "compromised": 1.0
 }
 MISDIRECT_CHANCE = { # Routing table
     "operational": 0.0,

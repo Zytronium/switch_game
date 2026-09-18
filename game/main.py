@@ -2,6 +2,7 @@
 
 import argparse
 import curses
+from dataclasses import dataclass
 import json
 import os
 import re
@@ -12,11 +13,12 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 try:  # Package execution: ``python -m game.main``.
-    from .net_bridge import NetBridge
-    from .state import Game
+    from .net_bridge import NetBridge, NetEvent
+    from .state import Game, Status, get_cmd_action
+
 except ImportError:  # Direct execution with ``game`` on PYTHONPATH.
-    from net_bridge import NetBridge
-    from state import Game
+    from net_bridge import NetBridge, NetEvent
+    from state import Game, Status, get_cmd_action
 
 
 FRAME_RATE = 60.0
@@ -52,6 +54,37 @@ STATUS_COLORS = {
 _STATUS_PATTERN = re.compile(r"\b(operational|degraded|compromised)\b", re.IGNORECASE)
 _COLORS_READY = False
 CONFIG_PATH = Path.home() / "switch_n_hack" / "config.json"
+TUTORIAL_JSON_PATH = Path(__file__).parent / "tutorial.json"
+_PRACTICE_PEER_MAC = "02:00:00:00:00:01"
+
+@dataclass
+class TutorialStep:
+    title: str
+    content: str
+    tips: list[str]
+    interactive: bool
+    demo_command: Optional[str]
+    next_button: str
+
+
+def _load_tutorial_steps(path: Path = TUTORIAL_JSON_PATH) -> list[TutorialStep]:
+    with path.open(encoding="utf-8") as tutorial_file:
+        raw_steps = json.load(tutorial_file)
+
+    if not isinstance(raw_steps, list):
+        raise ValueError(f"{path} must contain a JSON array of tutorial steps.")
+
+    steps = []
+    for raw_step in raw_steps:
+        steps.append(TutorialStep(
+            title=raw_step.get("title", ""),
+            content=raw_step.get("content", ""),
+            tips=raw_step.get("tips", []),
+            interactive=raw_step.get("interactive", False),
+            demo_command=raw_step.get("demo_command", None),
+            next_button=raw_step.get("next_button", "Press Enter")
+        ))
+    return steps
 
 
 def _get_config_path() -> Path:
@@ -116,24 +149,97 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _show_tutorial(screen: "curses.window") -> None:
-    """Display the short first-run introduction and wait for acknowledgement."""
-    screen.erase()
-    lines = (
-        "SWITCH 'n HACK",
-        "",
-        "Attack, defend, repair, inspect, and set honeypots using commands.",
-        "The first player to compromise the opponent's kernel wins.",
-        "",
-        "Press any key to continue.",
-    )
-    for row, line in enumerate(lines):
-        try:
-            screen.addstr(row, 0, line)
-        except curses.error:
-            pass
-    screen.refresh()
-    screen.getch()
+def _run_tutorial(screen: "curses.window", steps: list[TutorialStep]) -> None:
+    _init_colors()
+    curses.curs_set(0)
+    curses.noecho()
+    curses.cbreak()
+    screen.keypad(True)
+    screen.nodelay(False)
+
+    practice_game: Optional[Game] = None
+    index = 0
+    while index < len(steps):
+        step = steps[index]
+
+        _render_tutorial_card(screen, step, index, len(steps))
+        key = screen.getch()
+        if key == curses.KEY_RESIZE:
+            curses.update_lines_cols()
+            continue
+        if key in (27, ord("q"), ord("Q"), 3):
+            return
+        if key not in (curses.KEY_ENTER, 10, 13):
+            continue  # anything else: redraw this same slide, don't advance
+
+        if not step.interactive:
+            index += 1
+            continue
+
+        # interactive: hand off to the real dashboard temporarily
+        if practice_game is None:
+            practice_game = Game(_PracticeBridge())
+            practice_game.phase = "playing"
+            practice_game.start_time = time.monotonic()
+
+        _prime_practice_state_for_step(practice_game, step)
+
+        if not _run_interactive_step(screen, practice_game, step):
+            return
+        index += 1
+
+
+class _PracticeBridge:
+    def __init__(self) -> None:
+        self._next_seq = 1
+        self._pending: list[tuple[float, "NetEvent"]] = []
+        self.self_corruption_chance = 0.0
+
+    def _seq(self) -> int:
+        seq = self._next_seq
+        self._next_seq += 1
+        return seq
+
+    def _queue(self, event: "NetEvent", delay: float = 0.4) -> None:
+        self._pending.append((time.monotonic() + delay, event))
+
+    # outgoing sends called by Game
+
+    def send_attack(self, system: str) -> int:
+        seq = self._seq()
+        self._queue(NetEvent(
+            type="attack_result",
+            seq=seq,
+            data={"orig_seq": seq, "system": system, "success": True},
+            src_mac=_PRACTICE_PEER_MAC
+        ))
+
+    def send_attack_result(self, system: str, success: bool, orig_seq: int, honeypot_hit: bool = False) -> None:
+        pass  # No opponent listing for result
+
+    def send_inspect_request(self, system: Optional[str]) -> int:
+        seq = self._seq()
+        targets = [system] if system else ["firewall", "antivirus", "routing_table", "arp_cache", "terminal", "kernel"]
+        report = {sys: "operational" for sys in targets}
+        self._queue(NetEvent(
+            type="inspect_response",
+            seq=seq,
+            data={"orig_seq": seq, "systems": report, "blocked": False},
+            src_mac=_PRACTICE_PEER_MAC
+        ))
+        return seq
+
+    def send_inspect_response(self, report: dict, orig_seq: int, blocked: bool) -> None:
+        pass
+
+    def send_game_over(self, reason: str, damage_score: Optional[int] = None) -> None:
+        pass
+
+    def poll(self) -> list:
+        now = time.monotonic()
+        ready = [event for ready_time, event in self._pending if ready_time <= now]
+        self._pending = [pair for pair in self._pending if pair[0] > now]
+        return ready
 
 
 def _safe_add(window: "curses.window", y: int, x: int, text: str, width: int,
@@ -255,7 +361,8 @@ def _wrap_log(lines: Sequence[str], width: int, max_lines: int) -> list[str]:
 
 
 def _render(screen: "curses.window", game: Game, command: str,
-            cursor: int, command_history: Sequence[str], now: float) -> None:
+            cursor: int, command_history: Sequence[str], now: float,
+            tutorial_hint: Optional[str] = None) -> None:
     height, width = screen.getmaxyx()
     screen.erase()
     if height < 18 or width < 72:
@@ -265,15 +372,26 @@ def _render(screen: "curses.window", game: Game, command: str,
         return
 
     warning = "[WARNING] INCOMING ATTACK DETECTED!" if game.warning_until > now else ""
-    title = "SWITCH 'n HACK"
+    title = "Switch 'n Hack"
     inner = width - 2
     half_left = inner // 2
     half_right = inner - half_left
     default_attr = _default_attr(game)
+
+    # top banner: tutorial hint takes priority over the real warning
+    if tutorial_hint:
+        banner_text = tutorial_hint
+        banner_attr = _color_attr("cyan", curses.A_BOLD)
+    elif game.warning_until > now:
+        banner_text = "[WARNING] INCOMING ATTACK DETECTED!"
+        banner_attr = _color_attr("yellow", curses.A_BOLD | curses.A_BLINK)
+    else:
+        banner_text = ""
+        banner_attr = default_attr
+
     _safe_add(screen, 0, 0, "╔" + "═" * (width - 2) + "╗", width, default_attr)
     _safe_add(screen, 1, 0, "║", width, default_attr)
-    _safe_add(screen, 1, 2, warning, width - 2,
-              _color_attr("yellow", curses.A_BOLD | curses.A_BLINK) if warning else default_attr)
+    _safe_add(screen, 1, 2, banner_text, width - 2, banner_attr)
     _safe_add(screen, 1, max(2, width - len(title) - 3), title, width - 1,
               default_attr | curses.A_BOLD)
     _safe_add(screen, 1, width - 1, "║", width, default_attr)
@@ -411,6 +529,181 @@ def _delete_previous_word(command: str, cursor: int) -> tuple[str, int]:
     return command[:cursor] + command[end:], cursor
 
 
+def _render_tutorial_card(screen: "curses.window", step: TutorialStep, index: int, total: int) -> None:
+    height, width = screen.getmaxyx()
+    screen.erase()
+    if height < 14 or width < 60:
+        _safe_add(screen, 0, 0, "Terminal too small; resize to at least 60x14.", width, curses.A_BOLD)
+        screen.refresh()
+        return
+
+    header = "Switch 'n Hack - Tutorial"
+    progress = f"[{index + 1}/{total}]"
+
+    # frame
+    _safe_add(screen, 0, 0, "╔" + "═" * (width - 2) + "╗", width)
+    _safe_add(screen, 1, 0, "║", width)
+    _safe_add(screen, 1, 2, header, width - 4, curses.A_BOLD | _color_attr("cyan"))
+    _safe_add(screen, 1, max(2, width - len(progress) - 3), progress, width - 1, _color_attr("gray"))
+    _safe_add(screen, 1, width - 1, "║", width)
+    _safe_add(screen, 2, 0, "╠" + "═" * (width - 2) + "╣", width)
+    for row in range(3, height - 3):
+        _safe_add(screen, row, 0, "║", width)
+        _safe_add(screen, row, width - 1, "║", width)
+    _safe_add(screen, height - 3, 0, "╠" + "═" * (width - 2) + "╣", width)
+    _safe_add(screen, height - 1, 0, "╚" + "═" * (width - 2) + "╝", width)
+
+    body_width = width - 4
+    row = 4
+
+    # title
+    _safe_add(screen, row, 2, step.title, body_width, curses.A_BOLD | _color_attr("yellow"))
+    row += 2
+
+    # body text
+    for line in textwrap.wrap(step.content, width=body_width):
+        if row >= height - 4:
+            break
+        _safe_add(screen, row, 2, line, body_width, 0)
+        row += 1
+
+    # tips
+    if step.tips and row < height - 4:
+        row += 1
+        row += 1
+        for tip in step.tips:
+            if row >= height - 4:
+                break
+            for line in textwrap.wrap(f"‣ {tip}", width=body_width):
+                if row >= height - 4:
+                    break
+                _safe_add(screen, row, 2, line, body_width, _color_attr("gray"))
+                row += 1
+
+    # footer prompt
+    _safe_add(screen, height - 2, 0, "║", width)
+    _safe_add(screen, height - 2, 2, step.next_button, body_width, curses.A_BLINK | curses.A_REVERSE)
+    _safe_add(screen, height - 2, width - 1, "║", width)
+
+    screen.refresh()
+
+def _run_interactive_step(screen: "curses.window", game: Game, step: TutorialStep) -> bool:
+    curses.curs_set(1)
+    command = ""
+    cursor = 0
+    history: list = []
+    history_index: Optional[int] = None
+    escape_pending = False
+    escape_deadline = 0.0
+    next_frame = time.monotonic()
+
+    demo_action = None
+    demo_system = None
+    if step.demo_command:
+        demo_parts = step.demo_command.split()
+        demo_action = get_cmd_action(demo_parts[0].lower())
+        demo_system = demo_parts[1].lower() if len(demo_parts) > 1 else None
+    hint = f"Try it: {step.demo_command}" if step.demo_command else step.next_button
+
+    while True:
+        now = time.monotonic()
+        if escape_pending and now >= escape_deadline:
+            return False
+        if now >= next_frame:
+            game.tick()
+            _render(screen, game, command, cursor, history, now, tutorial_hint=hint)
+            next_frame = now + FRAME_INTERVAL_S
+
+        key = _read_key(screen)
+        if key is not None:
+            if key == 3:  # Ctrl-C
+                return False
+            if escape_pending:
+                if key in (curses.KEY_BACKSPACE, 8, 127):
+                    command, cursor = _delete_previous_word(command, cursor)
+                    escape_pending = False
+                    continue
+                return False
+            if key == 27:
+                escape_pending = True
+                escape_deadline = time.monotonic() + ESCAPE_SEQUENCE_TIMEOUT_S
+                continue
+            if key in (getattr(curses, "KEY_TAB", 9), 9):
+                command, cursor = _autocomplete(command, cursor)
+            if key in (curses.KEY_ENTER, 10, 13):
+                submitted = command
+                command = ""
+                cursor = 0
+                if submitted.strip():
+                    history.append(submitted)
+                    game.log.append("> " + submitted)
+                    game.handle_command(submitted)
+                    history_index = None
+
+                    # did this satisfy the demo?
+                    typed_parts = submitted.strip().split()
+                    typed_action = get_cmd_action(typed_parts[0].lower())
+                    typed_system = typed_parts[1].lower() if len(typed_parts) > 1 else None
+                    matched = (
+                            demo_action is None
+                            or (typed_action == demo_action and typed_system == demo_system)
+                    )
+                    if matched:
+                        _render(screen, game, command, cursor, history,
+                                time.monotonic(), tutorial_hint=hint)
+                        time.sleep(0.6)  # let the player see the result before advancing
+                        return True
+            elif key in (curses.KEY_BACKSPACE, 8, 127):
+                if cursor:
+                    command = command[:cursor - 1] + command[cursor:]
+                    cursor -= 1
+            elif key == curses.KEY_DC:
+                command = command[:cursor] + command[cursor + 1:]
+            elif key in (curses.KEY_LEFT,):
+                cursor = max(0, cursor - 1)
+            elif key in (curses.KEY_RIGHT,):
+                cursor = min(len(command), cursor + 1)
+            elif key == curses.KEY_HOME:
+                cursor = 0
+            elif key == curses.KEY_END:
+                cursor = len(command)
+            elif key == curses.KEY_UP:
+                if history:
+                    history_index = len(history) - 1 if history_index is None else max(0, history_index - 1)
+                    command = history[history_index]
+                    cursor = len(command)
+            elif key == curses.KEY_DOWN:
+                if history_index is not None:
+                    history_index += 1
+                    if history_index >= len(history):
+                        history_index = None
+                        command = ""
+                    else:
+                        command = history[history_index]
+                    cursor = len(command)
+            elif 32 <= key <= 126:
+                character = chr(key)
+                if character.isalpha() and not game.can_type_character(character):
+                    continue
+                command = command[:cursor] + character + command[cursor:]
+                cursor += 1
+
+        delay = next_frame - time.monotonic()
+        if delay > 0:
+            time.sleep(min(delay, 0.002))
+
+
+def _prime_practice_state_for_step(game: Game, step: TutorialStep) -> None:
+    if not step.demo_command:
+        return
+    parts = step.demo_command.split()
+    action = get_cmd_action(parts[0].lower())
+    system = parts[1].lower() if len(parts) > 1 else None
+    if action == "repair" and system and system != "kernel":
+        if game.my.get(system) == Status.OPERATIONAL:
+            game.my.set(system, Status.DEGRADED)
+
+
 def _run_ui(screen: "curses.window", game: Game) -> int:
     _init_colors()
     curses.curs_set(1)
@@ -526,7 +819,8 @@ def run(
     """Connect and run the 60 FPS terminal dashboard."""
     config = _load_config()
     if tutorial or not config.get("seen_tutorial", False):
-        curses.wrapper(_show_tutorial)
+        steps = _load_tutorial_steps()
+        curses.wrapper(_run_tutorial, steps)
         config["seen_tutorial"] = True
         _save_config(config)
 

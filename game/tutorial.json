@@ -1,13 +1,14 @@
 [
   {
     "title": "Welcome to the switch game: Switch 'n Hack!",
-    "content": "In this game, which does not work over WiFi and requires an Ethernet switch, two players physically connect via switch and hack each other's systems, trying to compromise the other's interface first. You will attack your opponent's systems while defending, repairing, and boobytrapping your own. If your kernel is compromised, you loose, so your aim is to compromise your opponent's kernel before they compromise yours.",
+    "content": "In this 2-player game, which does not work over WiFi, two players physically connect their computers via Ethernet switch and hack each other's systems, trying to compromise the other's interface first. You will attack your opponent's systems while defending, repairing, and boobytrapping your own. If your kernel is compromised, you loose, so your aim is to compromise your opponent's kernel before they compromise yours.",
     "tips": [
       "Switch 'n Hack is a realtime strategy game. There are no turns and you must act fast!",
-      "The game timer lasts for 15 minutes. If time runs out before a player can compromise the other's kernel, whoever has taken less damage wins."
+      "The game timer lasts for 15 minutes. If time runs out before a player can compromise the other's kernel, whoever has taken less damage wins.",
+      "Note: This game only runs on Linux and will not run without sudo. This is a limitation of how the game sends raw Ethernet frames that intentionally don't work over WiFi."
     ],
     "interactive": false,
-    "next_button": "Press Enter"
+    "next_button": "Press Enter to coninue"
   },
   {
     "title": "Your Systems",
@@ -18,7 +19,7 @@
       "Kernel only becomes a valid target once the Terminal is compromised too."
     ],
     "interactive": false,
-    "next_button": "Press Enter"
+    "next_button": "Press Enter to coninue"
   },
   {
     "title": "The Firewall",
@@ -29,40 +30,40 @@
       "While compromised, it blocks nothing."
     ],
     "interactive": false,
-    "next_button": "Press Enter"
+    "next_button": "Press Enter to coninue"
   },
   {
     "title": "The Antivirus",
     "content": "Your Antivirus enables you to defend systems (one at a time). While not compromised, it can enhance security on a specific system, making attacks on that system less likely to succeed for several seconds. The Antivirus also warns you of incoming attacks, though it cannot specify which system is being attacked.",
     "tips": [
-      "When defending while operational, the Antivirus adds a 0.25x multiplier to the success chance of attacks on the defended system.",
-      "When defending while degraded, it adds a 0.15x multiplier to the success chance of attacks on the defended system.",
+      "When defending while operational, the Antivirus adds a 0.75x multiplier to the success chance of attacks on the defended system.",
+      "When defending while degraded, it adds a 0.85x multiplier to the success chance of attacks on the defended system.",
       "While compromised, you cannot defend systems period and you get no attack warning alerts."
     ],
     "interactive": false,
-    "next_button": "Press Enter"
+    "next_button": "Press Enter to coninue"
   },
   {
     "title": "The Routing Table",
-    "content": "Your Routing Table ensures your attacks get routed to the correct system. While technically routing tables in real life route IP addresses (and therefore devices, not subsystems), its a game - don't cry about it please.",
+    "content": "Your Routing Table ensures your attacks get routed to the correct system. While technically routing tables in real life route IP addresses (and therefore devices, not subsystems), its just a game, don't cry about it please.",
     "tips": [
       "While operational, the Routing Table routes 100% of attacks correctly unless actual frame corruption occurs, which is possible by design.",
       "While degraded, it routes 75% of attacks correctly.",
       "While compromised, it routes about 33% of attacks correctly, which can be quite annoying."
     ],
     "interactive": false,
-    "next_button": "Press Enter"
+    "next_button": "Press Enter to coninue"
   },
   {
     "title": "The ARP Cache",
-    "content": "Your ARP Cache helps ensure packets don't get corrupted. (Again, please don't cry about this not being accurate to real life.) If this gets damaged, actual frame corruption can occur more frequently, causing attacks to sometimes fail or even make the wrong move (i.e. repair a system instead of attack it).",
+    "content": "Your ARP Cache helps ensure packets don't get corrupted. (Again, please don't cry about this not being accurate to real life.) If this gets damaged, actual frame corruption can occur more frequently, causing attacks to sometimes fail or even attack the wrong system.",
     "tips": [
       "While operational, the ARP Cache prevents almost all corruption. Genuine natural corruption can still occur, though extremely rarely.",
-      "While degraded, packets have an additional 10% chance of being corrupted, though this is through artificial means (but it's still genuine corruption, just not caused naturally).",
-      "While compromised, it about 33% of packets will corrupt."
+      "While degraded, packets have an additional 10% chance of being corrupted, though this is through artificial means (it's still genuine corruption, just not caused naturally).",
+      "While compromised, about 33% of packets will corrupt."
     ],
     "interactive": false,
-    "next_button": "Press Enter"
+    "next_button": "Press Enter to coninue"
   },
   {
     "title": "The Terminal Interface",
@@ -75,11 +76,11 @@
       "While compromised, the terminal is completely locked for the first 30 seconds, which is plenty of time for you to watch in horror, completely helpless, as your opponent deals the final blow to your Kernel, crashing your system and displaying that terrifying GAME OVER message once and for all! Your mind decompiles, and you learn that it was a dream all alo- this is a tutorial, not a text adventure game. Let's move on."
     ],
     "interactive": false,
-    "next_button": "Press Enter"
+    "next_button": "Press Enter to coninue"
   },
   {
     "title": "The Kernel",
-    "content": "Your Kernel is the operating system that runs the game. It's the Chess King of Switch 'n Hack. It doesn't do much, but if its gone, its game over. Literally.",
+    "content": "Your Kernel is the operating system that runs the game. It's the Chess King of Switch 'n Hack. It doesn't do much, but if its attacked, its game over. Literally.",
     "tips": [
       "The Kernel cannot be attacked unless all previously mentioned systems, including the Terminal, are compromised.",
       "The Kernel has no real function.",
@@ -88,18 +89,18 @@
       "The Kernel has no degraded status. One attack and its game over."
     ],
     "interactive": false,
-    "next_button": "Press Enter"
+    "next_button": "Press Enter to coninue"
   },
   {
     "title": "Attacking",
-    "content": "Use 'attack <system>' (or 'atk'/'tar'/'target') to strike at one of your opponent's systems. Success isn't guaranteed, it depends on the health of your opponent's Firewall, as well as your ARP Cache. A healthier Firewall on the opponent's side means a lower chance of success, as does a damaged ARP Cache on your end.",
+    "content": "Use 'attack <system>' (or 'atk'/'tar'/'target') to hack one of your opponent's systems. Success isn't guaranteed, it depends on the health of your opponent's Firewall, as well as your ARP Cache. A healthier Firewall on the opponent's side means a lower chance of success, as does a damaged ARP Cache on your end. Attacking a system currently being defended by your opponent will also have a lower success chance.",
     "tips": [
       "Attacks have a short 2-second cooldown between uses.",
       "A successful attack damages the system by one level: operational to degraded, and degraded to compromised."
     ],
     "demo_command": "atk firewall",
     "interactive": true,
-    "next_button": "Try it: atk firewall"
+    "next_button": "Press Enter to try it"
   },
   {
     "title": "Defending",
@@ -109,7 +110,7 @@
     ],
     "demo_command": "def antivirus",
     "interactive": true,
-    "next_button": "Try it: def antivirus"
+    "next_button": "Press Enter to try it"
   },
   {
     "title": "Repairing",
@@ -120,7 +121,7 @@
     ],
     "demo_command": "rep firewall",
     "interactive": true,
-    "next_button": "Try it: rep firewall"
+    "next_button": "Press Enter to try it"
   },
   {
     "title": "Inspecting",
@@ -131,7 +132,7 @@
     ],
     "demo_command": "ins firewall",
     "interactive": true,
-    "next_button": "Try it: ins firewall"
+    "next_button": "Press Enter to try it"
   },
   {
     "title": "Honeypots",
@@ -142,7 +143,7 @@
     ],
     "demo_command": "pot arp_cache",
     "interactive": true,
-    "next_button": "Try it: pot arp_cache"
+    "next_button": "Press Enter to try it"
   },
   {
     "title": "Forfeiting",
@@ -152,19 +153,19 @@
       "To avoid depriving your opponent of a win, from their perspective, all your systems become compromised and they are permitted a final blow to your Kernel as a victory lap."
     ],
     "interactive": false,
-    "next_button": "Press Enter"
+    "next_button": "Press Enter to coninue"
   },
   {
     "title": "Help",
     "content": "Type 'help' (or '?') during a match to see the full list of commands and their aliases without leaving the game.",
     "demo_command": "help",
     "interactive": true,
-    "next_button": "Try it: help"
+    "next_button": "Press Enter to try it"
   },
   {
     "title": "Your ready to start hacking!",
-    "content": "That's everything you need to know! Now go hack your opponent to death or find an exploit to cheat your way across that Ethernet wire. This is the wild west of cyber security, anything is possible. Have fun!",
+    "content": "That's everything you need to know! Now go hack your opponent to death or find an exploit to cheat your way across that Ethernet wire. This is the wild west of cybersecurity, anything is possible. Have fun!",
     "interactive": false,
-    "next_button": "End tutorial"
+    "next_button": "Press Enter to end tutorial"
   }
 ]
