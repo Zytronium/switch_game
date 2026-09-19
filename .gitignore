@@ -1,4 +1,6 @@
 net/target/
+.release-build/
+release/
 .idea/
 .venv/
 *gitignore-me*

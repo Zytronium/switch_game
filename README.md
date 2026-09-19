@@ -74,3 +74,73 @@ Each player can make the following moves at any time:
 | `pot` or `honeypot`                | system            | Sets up a honeypot system that masks itself as one of the legitimate systems. |
 | `pot` or `honeypot`                | system            | Sets up a honeypot system that masks itself as one of the legitimate systems. |
 | `?`, or `help`                     |                   | Displays a list of commands and what they do.                                 |
+
+## Download and run a release
+
+Releases are Linux executables built for one CPU architecture and glibc baseline. Download the artifact whose name
+matches your machine, make it executable, and run it with the name of a physical Ethernet interface:
+
+```bash
+chmod +x switch-n-hack-linux-x86_64-glibc-2.44
+sudo ./switch-n-hack-linux-x86_64-glibc-2.44 eth0
+```
+
+The executable bundles Python, the Rust `switch_net` extension, and the tutorial. Players do not need Python, Rust,
+Maturin, or any Python package installed. It is not a universal Linux binary: an artifact built on `x86_64` cannot run
+on ARM, and an artifact built against a newer glibc may not run on an older distribution. Build a separate release on
+each supported target.
+
+### Network and privilege requirements
+
+Both players must use computers connected to the same Layer-2 Ethernet switch (or directly by Ethernet cable). Wi-Fi,
+routers, and internet connections are not supported. Find interface names with:
+
+```bash
+ip -br link
+```
+
+Choose the connected wired interface, such as `enp3s0` or `eth0`; do not choose `lo` or a Wi-Fi interface.
+
+The game sends raw Ethernet frames, so it requires root or `CAP_NET_RAW`. The simplest option is `sudo` as shown above.
+To run as your normal user instead, apply the deliberately scoped capability to the downloaded executable:
+
+```bash
+sudo setcap cap_net_raw+eip ./switch-n-hack-linux-x86_64-glibc-2.44
+./switch-n-hack-linux-x86_64-glibc-2.44 enp3s0
+```
+
+Only grant this capability to a trusted executable and remove it when finished with `sudo setcap -r ./switch-n-hack-*`.
+Using `sudo` can cause the first-run configuration marker to be written under the elevated user's home directory; the
+capability approach preserves the normal user's `~/switch_n_hack/config.json`.
+
+The first run shows the tutorial. It can also be selected explicitly with `--tutorial`; its completion marker is stored
+in `~/switch_n_hack/config.json`. The peer can be selected explicitly when broadcast discovery is unsuitable:
+
+```bash
+./switch-n-hack-linux-x86_64-glibc-2.44 --peer-mac 02:00:00:00:00:02 --connect-timeout 15000 enp3s0
+```
+
+### Building a release
+
+Build on the Linux architecture and glibc baseline you intend to support. The host must have `python3`, `python3-venv`,
+`cargo`, and network access for the build tools on the first run:
+
+```bash
+./build-release.sh
+```
+
+The script creates a disposable `.release-build` environment, compiles the Rust extension in release mode, freezes the
+game with PyInstaller, and writes an architecture/ABI-labeled executable and `.sha256` checksum under `release/`.
+Re-running it removes only its own temporary build directory, ensuring an old native extension cannot be selected.
+
+### Troubleshooting
+
+- `Permission denied`, raw-socket errors, or a datalink permission message: rerun with `sudo` or use the scoped
+  `setcap` command above.
+- An interface-not-found or invalid-interface error: rerun `ip -br link` and pass the connected Ethernet interface,
+  not its description or MAC address.
+- `! unable to connect to another player`: confirm both processes use the same switch, wired interfaces, and compatible
+  release builds; wait for the peer or increase `--connect-timeout`.
+- The terminal is too small or the UI is hard to read: enlarge the terminal before starting the game.
+- The tutorial appears again: check that the process can write `~/switch_n_hack/config.json`; this is commonly caused by
+  running once with `sudo` and once as the normal user.
