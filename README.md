@@ -77,12 +77,14 @@ Each player can make the following moves at any time:
 
 ## Download and run a release
 
-Releases are Linux executables built for one CPU architecture and glibc baseline. Download the artifact whose name
-matches your machine, make it executable, and run it with the name of a physical Ethernet interface:
+Releases are Linux executables built for one CPU architecture and glibc baseline. The release script builds in a Debian
+12 container by default, giving the artifact a glibc 2.36 baseline that is compatible with distributions using glibc
+2.36 or newer. Download the artifact whose name matches your machine, make it executable, and run it with the name of
+a physical Ethernet interface:
 
 ```bash
-chmod +x switch-n-hack-linux-x86_64-glibc-2.44
-sudo ./switch-n-hack-linux-x86_64-glibc-2.44 eth0
+chmod +x switch-n-hack-linux-x86_64-glibc-2.36
+sudo ./switch-n-hack-linux-x86_64-glibc-2.36 eth0
 ```
 
 The executable bundles Python, the Rust `switch_net` extension, and the tutorial. Players do not need Python, Rust,
@@ -122,16 +124,18 @@ in `~/switch_n_hack/config.json`. The peer can be selected explicitly when broad
 
 ### Building a release
 
-Build on the Linux architecture and glibc baseline you intend to support. The host must have `python3`, `python3-venv`,
-`cargo`, and network access for the build tools on the first run:
+The portable build uses Docker or Podman and network access for the container and Python build tools on the first run:
 
 ```bash
 ./build-release.sh
 ```
 
-The script creates a disposable `.release-build` environment, compiles the Rust extension in release mode, freezes the
+The script creates a disposable Debian 12 build environment, compiles the Rust extension in release mode, freezes the
 game with PyInstaller, and writes an architecture/ABI-labeled executable and `.sha256` checksum under `release/`.
-Re-running it removes only its own temporary build directory, ensuring an old native extension cannot be selected.
+Re-running it removes only its own temporary build directory, ensuring an old native extension cannot be selected. If
+Docker and Podman are unavailable, the script warns and falls back to the current host automatically; that artifact is
+only suitable for systems with a compatible glibc. To select this fallback explicitly, use
+`LOCAL_BUILD=1 ./build-release.sh`.
 
 ### Troubleshooting
 
