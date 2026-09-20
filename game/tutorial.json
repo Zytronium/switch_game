@@ -12,7 +12,7 @@
   },
   {
     "title": "Your Systems",
-    "content": "You are defending four core systems: Firewall, Antivirus, Routing Table, and ARP Cache. Each has its own function that affects gameplay. These systems start Operational and can be knocked down to Degraded (where their function is, well, degraded), then to Compromised (where they stop functioning). Behind all of them sits the Terminal and the Kernel. If all core systems are compromised, your Terminal interface becomes vulnerable to attack. Once your Terminal is compromised, your Kernel becomes a target. The Kernel is like a popcorn kernel - it's either popped (compromised) or not popped (operational). This means its a one-hit kill.",
+    "content": "You are defending four core systems: Firewall, Antivirus, Routing Table, and ARP Cache. Each has its own function that affects gameplay. These systems start Operational and can be knocked down to Degraded (where their function is, well, degraded), then to Compromised (where they stop functioning). Behind all of them sits the Terminal and the Kernel. If all core systems are compromised, your Terminal interface becomes vulnerable to attack. Once your Terminal is compromised, your Kernel becomes a target. The Kernel is like a popcorn kernel - it's either popped (compromised) or not popped (operational). This means it's a one-hit kill.",
     "tips": [
       "The first four systems (firewall, antivirus, routing_table, arp_cache) can be attacked at any time.",
       "Terminal only becomes a valid target once all four core systems are compromised.",
@@ -45,7 +45,7 @@
   },
   {
     "title": "The Routing Table",
-    "content": "Your Routing Table ensures your attacks get routed to the correct system. While technically routing tables in real life route IP addresses (and therefore devices, not subsystems), its just a game, don't cry about it please.",
+    "content": "Your Routing Table ensures your attacks get routed to the correct system. While technically routing tables in real life route IP addresses (and therefore devices, not subsystems), it's just a game, don't cry about it please.",
     "tips": [
       "While operational, the Routing Table routes 100% of attacks correctly unless actual frame corruption occurs, which is possible by design.",
       "While degraded, it routes 75% of attacks correctly.",
@@ -80,13 +80,13 @@
   },
   {
     "title": "The Kernel",
-    "content": "Your Kernel is the operating system that runs the game. It's the Chess King of Switch 'n Hack. It doesn't do much, but if its attacked, its game over. Literally.",
+    "content": "Your Kernel is the operating system that runs the game. It's the Chess King of Switch 'n Hack. It doesn't do much, but if it's attacked, it's game over. Literally.",
     "tips": [
       "The Kernel cannot be attacked unless all previously mentioned systems, including the Terminal, are compromised.",
       "The Kernel has no real function.",
       "While operational, you may play the game.",
       "When compromised, you loose.",
-      "The Kernel has no degraded status. One attack and its game over."
+      "The Kernel has no degraded status. One attack and it's game over."
     ],
     "interactive": false,
     "next_button": "Press Enter to coninue"
