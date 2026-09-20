@@ -8,7 +8,7 @@
       "Note: This game only runs on Linux and will not run without sudo. This is a limitation of how the game sends raw Ethernet frames that intentionally don't work over WiFi."
     ],
     "interactive": false,
-    "next_button": "Press Enter to coninue"
+    "next_button": "Press Enter to continue"
   },
   {
     "title": "Your Systems",
@@ -19,7 +19,7 @@
       "Kernel only becomes a valid target once the Terminal is compromised too."
     ],
     "interactive": false,
-    "next_button": "Press Enter to coninue"
+    "next_button": "Press Enter to continue"
   },
   {
     "title": "The Firewall",
@@ -30,7 +30,7 @@
       "While compromised, it blocks nothing."
     ],
     "interactive": false,
-    "next_button": "Press Enter to coninue"
+    "next_button": "Press Enter to continue"
   },
   {
     "title": "The Antivirus",
@@ -41,7 +41,7 @@
       "While compromised, you cannot defend systems period and you get no attack warning alerts."
     ],
     "interactive": false,
-    "next_button": "Press Enter to coninue"
+    "next_button": "Press Enter to continue"
   },
   {
     "title": "The Routing Table",
@@ -52,7 +52,7 @@
       "While compromised, it routes about 33% of attacks correctly, which can be quite annoying."
     ],
     "interactive": false,
-    "next_button": "Press Enter to coninue"
+    "next_button": "Press Enter to continue"
   },
   {
     "title": "The ARP Cache",
@@ -63,7 +63,7 @@
       "While compromised, about 33% of packets will corrupt."
     ],
     "interactive": false,
-    "next_button": "Press Enter to coninue"
+    "next_button": "Press Enter to continue"
   },
   {
     "title": "The Terminal Interface",
@@ -76,7 +76,7 @@
       "While compromised, the terminal is completely locked for the first 30 seconds, which is plenty of time for you to watch in horror, completely helpless, as your opponent deals the final blow to your Kernel, crashing your system and displaying that terrifying GAME OVER message once and for all! Your mind decompiles, and you learn that it was a dream all alo- this is a tutorial, not a text adventure game. Let's move on."
     ],
     "interactive": false,
-    "next_button": "Press Enter to coninue"
+    "next_button": "Press Enter to continue"
   },
   {
     "title": "The Kernel",
@@ -89,7 +89,7 @@
       "The Kernel has no degraded status. One attack and it's game over."
     ],
     "interactive": false,
-    "next_button": "Press Enter to coninue"
+    "next_button": "Press Enter to continue"
   },
   {
     "title": "Attacking",
@@ -153,7 +153,7 @@
       "To avoid depriving your opponent of a win, from their perspective, all your systems become compromised and they are permitted a final blow to your Kernel as a victory lap."
     ],
     "interactive": false,
-    "next_button": "Press Enter to coninue"
+    "next_button": "Press Enter to continue"
   },
   {
     "title": "Help",
