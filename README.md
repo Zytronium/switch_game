@@ -80,11 +80,11 @@ Each player can make the following moves at any time:
 Releases are Linux executables built for one CPU architecture and glibc baseline. The release script builds in a Debian
 12 container by default, giving the artifact a glibc 2.36 baseline that is compatible with distributions using glibc
 2.36 or newer. Download the artifact whose name matches your machine, make it executable, and run it with the name of
-a physical Ethernet interface:
+a physical Ethernet interface, or omit it to auto-detect an active wired interface:
 
 ```bash
 chmod +x switch-n-hack-linux-x86_64-glibc-2.36
-sudo ./switch-n-hack-linux-x86_64-glibc-2.36 eth0
+sudo ./switch-n-hack-linux-x86_64-glibc-2.36
 ```
 
 The executable bundles Python, the Rust `switch_net` extension, and the tutorial. Players do not need Python, Rust,
@@ -101,7 +101,9 @@ routers, and internet connections are not supported. Find interface names with:
 ip -br link
 ```
 
-Choose the connected wired interface, such as `enp3s0` or `eth0`; do not choose `lo` or a Wi-Fi interface.
+When selecting an interface manually, choose the connected wired interface, such as `enp3s0` or `eth0`; do not choose
+`lo` or a Wi-Fi interface. If omitted, the game selects an interface that is up, has a MAC address, is physical rather
+than virtual, and is not wireless. IP addresses are not required.
 
 The game sends raw Ethernet frames, so it requires root or `CAP_NET_RAW`. The simplest option is `sudo` as shown above.
 To run as your normal user instead, apply the deliberately scoped capability to the downloaded executable:

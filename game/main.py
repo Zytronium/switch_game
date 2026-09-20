@@ -125,10 +125,36 @@ def ensure_config(config_path: Path = CONFIG_PATH) -> None:
     _save_config(_load_config(config_path), config_path)
 
 
+def _auto_detect_interface(sysfs_root: Path = Path("/sys/class/net")) -> str:
+    try:
+        import switch_net
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("unable to auto-detect an Ethernet interface: switch_net is unavailable") from exc
+
+    for name, mac in switch_net.list_interfaces():
+        interface_path = sysfs_root / name
+        try:
+            is_up = (interface_path / "operstate").read_text(encoding="ascii").strip() == "up"
+        except OSError:
+            continue
+        if not mac or not is_up:
+            continue
+        # Physical interfaces have a device symlink; virtual interfaces such as
+        # bridges, VLANs, and containers generally do not.
+        if not (interface_path / "device").exists():
+            continue
+        if (interface_path / "wireless").exists():
+            continue
+        return name
+
+    raise RuntimeError("no active wired Ethernet interface with a MAC address was found")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Play Switch 'n Hack over Ethernet.")
     parser.add_argument(
         "interface",
+        nargs="?",
         help="Ethernet interface to use, for example eth0",
     )
     parser.add_argument(
@@ -842,8 +868,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("! connect timeout must be positive", file=sys.stderr)
         return 2
     try:
+        interface = args.interface or _auto_detect_interface()
         return run(
-            interface=args.interface,
+            interface=interface,
             peer_mac=args.peer_mac,
             connect_timeout_ms=args.connect_timeout,
             tutorial=args.tutorial,
