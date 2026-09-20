@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import textwrap
 from pathlib import Path
@@ -164,7 +165,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--connect-timeout",
         type=int,
-        default=10000,
+        default=30000,
         metavar="MILLISECONDS",
         help="how long to wait for the other player (default: 10000)",
     )
@@ -301,6 +302,95 @@ def _init_colors() -> None:
         _COLORS_READY = False
 
 
+_CONNECTING_SPINNER = (
+    ("╭─   ", "│    ", "     "),
+    ("╭──  ", "     ", "     "),
+    (" ─── ", "     ", "     "),
+    ("  ──╮", "     ", "     "),
+    ("   ─╮", "    │", "     "),
+    ("    ╮", "    │", "    ╯"),
+    ("     ", "    │", "   ─╯"),
+    ("     ", "     ", "  ──╯"),
+    ("     ", "     ", " ─── "),
+    ("     ", "     ", "╰──  "),
+    ("     ", "│    ", "╰─   "),
+    ("╭    ", "│    ", "╰    "),
+)
+
+
+def _render_connecting(screen: "curses.window", interface: str, now: float,
+                       timeout_ms: int = 0, started_at: float = 0.0) -> None:
+    """Render the animated screen shown while discovering the opponent."""
+    height, width = screen.getmaxyx()
+    screen.erase()
+    if height < 12 or width < 48:
+        _safe_add(screen, 0, 0, "Terminal too small; resize to at least 48x12.", width,
+                  curses.A_BOLD)
+        screen.refresh()
+        return
+
+    horizontal = "═" * (width - 2)
+    _safe_add(screen, 0, 0, "╔" + horizontal + "╗", width)
+    for row in range(1, height - 1):
+        _safe_add(screen, row, 0, "║", width)
+        _safe_add(screen, row, width - 1, "║", width)
+    _safe_add(screen, height - 1, 0, "╚" + horizontal + "╝", width)
+
+    title = "Switch 'n Hack"
+    spinner = _CONNECTING_SPINNER[int(now * 12) % len(_CONNECTING_SPINNER)]
+    _safe_add(screen, 2, max(2, (width - len(title)) // 2), title, width - 1,
+              curses.A_BOLD | _color_attr("cyan"))
+    spinner_top = height // 2 - 2
+    for offset, line in enumerate(spinner):
+        _safe_add(screen, spinner_top + offset, max(2, (width - len(line)) // 2), line,
+                  width - 1, curses.A_BOLD | _color_attr("yellow"))
+    message = "Waiting for opponent"
+    _safe_add(screen, spinner_top + len(spinner) + 1, max(2, (width - len(message)) // 2),
+              message, width - 1, curses.A_BOLD | _color_attr("yellow"))
+    if timeout_ms > 0:
+        remaining = max(0, int((timeout_ms / 1000) - (now - started_at) + 0.999))
+        timer = f"Timeout in {remaining}s"
+        _safe_add(screen, spinner_top + len(spinner) + 2, max(2, (width - len(timer)) // 2),
+                  timer, width - 1, _color_attr("gray"))
+        cancel_msg = "Press Ctrl+C to cancel"
+        _safe_add(screen, spinner_top + len(spinner) + 3, max(2, (width - len(cancel_msg)) // 2),
+                  cancel_msg, width - 1, _color_attr("gray"))
+    connection = f"Listening on {interface}"
+    _safe_add(screen, height - 2, max(2, (width - len(connection)) // 2), connection, width - 1,
+              _color_attr("gray"))
+    screen.refresh()
+
+
+def _run_connection_screen(screen: "curses.window", game: Game, interface: str,
+                           timeout_ms: int) -> bool:
+    """Animate the connection screen while the blocking handshake runs."""
+    _init_colors()
+    try:
+        curses.curs_set(0)
+    except curses.error:
+        pass
+
+    result: dict[str, object] = {}
+    started_at = time.monotonic()
+
+    def connect() -> None:
+        try:
+            result["connected"] = game.connect(timeout_ms=timeout_ms)
+        except BaseException as exc:
+            result["error"] = exc
+
+    worker = threading.Thread(target=connect, daemon=True)
+    worker.start()
+    while worker.is_alive():
+        _render_connecting(screen, interface, time.monotonic(), timeout_ms, started_at)
+        time.sleep(0.1)
+    worker.join()
+
+    if "error" in result:
+        raise result["error"]
+    return bool(result.get("connected", False))
+
+
 def _color_attr(color: str, extra: int = 0) -> int:
     if not _COLORS_READY:
         return extra
@@ -391,8 +481,8 @@ def _render(screen: "curses.window", game: Game, command: str,
             tutorial_hint: Optional[str] = None) -> None:
     height, width = screen.getmaxyx()
     screen.erase()
-    if height < 18 or width < 72:
-        _safe_add(screen, 0, 0, "Terminal too small; resize to at least 72x18.", width,
+    if height < 20 or width < 72:
+        _safe_add(screen, 0, 0, "Terminal too small; resize to at least 72x20.", width,
                   curses.A_BOLD)
         screen.refresh()
         return
@@ -853,8 +943,8 @@ def run(
     bridge = NetBridge(interface=interface, peer_mac=peer_mac)
     game = Game(bridge)
 
-    print(f"Connecting on {interface}...", flush=True)
-    if not game.connect(timeout_ms=connect_timeout_ms):
+    connected = curses.wrapper(_run_connection_screen, game, interface, connect_timeout_ms)
+    if not connected:
         print("! unable to connect to another player", flush=True)
         return 1
 
